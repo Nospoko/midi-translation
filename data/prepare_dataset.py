@@ -33,7 +33,8 @@ def process_record(piece: ff.MidiPiece, sequence_len: int, quantizer: MidiQuanti
 
     record = []
 
-    for subset in piece_quantized.df.rolling(window=sequence_len, step=sequence_len):
+    step = sequence_len // 2
+    for subset in piece_quantized.df.rolling(window=sequence_len, step=step):
         # rolling sometimes creates subsets with shorter sequence length, they are filtered here
         if len(subset) != sequence_len:
             continue
