@@ -11,7 +11,7 @@ from prepare_dataset import process_record
 from data.quantizer import MidiQuantizer
 
 
-class TokenizedMidiTranslationDataset:
+class TokenizedMidiDataset:
     def __init__(
         self,
         split: str = "train",
@@ -110,7 +110,7 @@ class TokenizedMidiTranslationDataset:
 
 
 def main():
-    dataset = TokenizedMidiTranslationDataset()
+    dataset = TokenizedMidiDataset()
 
     record = dataset.processed_records[0]
 
