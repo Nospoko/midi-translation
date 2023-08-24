@@ -6,7 +6,7 @@ import fortepyan as ff
 from tqdm import tqdm
 from tokenizer import Tokenizer
 from datasets import load_dataset
-from prepare_dataset import process_record
+from prepare_dataset import process_record, unprocessed_samples
 
 from data.quantizer import MidiQuantizer
 
@@ -43,8 +43,9 @@ class TokenizedMidiDataset:
         self._build()
 
     def _build(self):
-        self.processed_records = self.load_dataset()
+        self.processed_records, self.unprocessed_records = self.load_dataset()
 
+        print("Creating samples ...")
         for record in tqdm(self.processed_records):
             src_tokens = self.tokenizer_src(record)
             tgt_tokens = self.tokenizer_tgt(record)
@@ -73,20 +74,36 @@ class TokenizedMidiDataset:
             f"{self.quantizer.n_velocity_bins}.pt"
         )
         if os.path.isfile(path):
-            processed_records = torch.load(f=path)
+            records = torch.load(path)
+            processed_records = records['tokenized']
+            unprocessed_records = records['not_tokenized']
         else:
-            processed_records = self._build_dataset()
-            torch.save(obj=self.processed_records, f=path)
-        return processed_records
+            processed_records, unprocessed_records = self._build_dataset()
+            torch.save(
+                {
+                    "tokenized": processed_records,
+                    "not_tokenized": unprocessed_records,
+                },
+                f=path
+            )
+        return processed_records, unprocessed_records
 
-    def _build_dataset(self) -> list[dict]:
+    def _build_dataset(self) -> tuple[list[dict], list[dict]]:
+
         processed_records = []
+        unprocessed_records = []
+        print("Building a dataset ...")
         for record in tqdm(self.dataset, total=self.dataset.num_rows):
+            # print(record)
             piece = ff.MidiPiece.from_huggingface(record)
-            processed_record = process_record(piece, self.sequence_len, self.quantizer)
 
+            processed_record = process_record(piece, self.sequence_len, self.quantizer)
+            unprocessed_record = unprocessed_samples(piece, self.sequence_len)
+
+            unprocessed_records += unprocessed_record
             processed_records += processed_record
-        return processed_records
+
+        return processed_records, unprocessed_records
 
     def _build_vocab(self) -> tuple[list[str], list[str]]:
         vocab_src, vocab_tgt = ["<s>", "</s>"], ["<s>", "</s>"]
@@ -111,15 +128,21 @@ class TokenizedMidiDataset:
 
 def main():
     dataset = TokenizedMidiDataset()
+    unprocessed_record = dataset.unprocessed_records[0]
+    processed_record = dataset.processed_records[0]
 
-    record = dataset.processed_records[0]
-
-    src_tokens = dataset.tokenizer_src(record)
-    tgt_tokens = dataset.tokenizer_tgt(record)
+    src_tokens = dataset.tokenizer_src(processed_record)
+    tgt_tokens = dataset.tokenizer_tgt(processed_record)
 
     sample = dataset[0]
 
-    print(f"Record: {record} \n" f"src_tokens: {src_tokens} \n" f"tgt_tokens: {tgt_tokens} \n" f"sample: {sample}")
+    print(
+        f"Unprocessed record: \n {unprocessed_record} \n "
+        f"Processed record: {processed_record} \n" 
+        f"src_tokens: {src_tokens} \n" 
+        f"tgt_tokens: {tgt_tokens} \n" 
+        f"sample: {sample}"
+    )
 
 
 if __name__ == "__main__":
