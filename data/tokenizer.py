@@ -1,9 +1,7 @@
-
-
 class Tokenizer:
     def __init__(
-            self,
-            keys: list[str],
+        self,
+        keys: list[str],
     ):
         self.keys = keys
 
@@ -19,5 +17,3 @@ class Tokenizer:
             samples.append(sample[:-1])
 
         return samples
-
-

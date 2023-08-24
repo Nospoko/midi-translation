@@ -66,8 +66,12 @@ class TokenizedMidiTranslationDataset:
             self.samples.append((src, tgt))
 
     def load_dataset(self):
-        path = (f"dataset-{self.quantizer.n_dstart_bins}-{self.quantizer.n_duration_bins}-"
-                f"{self.quantizer.n_velocity_bins}.pt")
+        path = (
+            "dataset-"
+            f"{self.quantizer.n_dstart_bins}-"
+            f"{self.quantizer.n_duration_bins}-"
+            f"{self.quantizer.n_velocity_bins}.pt"
+        )
         if os.path.isfile(path):
             processed_records = torch.load(f=path)
         else:
