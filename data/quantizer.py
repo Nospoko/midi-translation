@@ -20,7 +20,7 @@ class MidiQuantizer:
         self.n_dstart_bins = n_dstart_bins
         self.n_duration_bins = n_duration_bins
         self.n_velocity_bins = n_velocity_bins
-
+        self.samples = []
         self._build()
 
     def __rich_repr__(self):
@@ -37,7 +37,7 @@ class MidiQuantizer:
 
     def _load_bin_edges(self):
         # Hydra changes paths, this finds it back
-        artifacts_path = to_absolute_path("../artifacts/bin_edges.yaml")
+        artifacts_path = to_absolute_path("artifacts/bin_edges.yaml")
         with open(artifacts_path, "r") as f:
             bin_edges = yaml.safe_load(f)
 
@@ -48,6 +48,7 @@ class MidiQuantizer:
     def quantize_piece(self, piece: MidiPiece) -> MidiPiece:
         # Try not to overwrite anything
         df = piece.df.copy()
+        self.samples.append(df)
         source = dict(piece.source) | {"quantized": True}
 
         # Make the quantization

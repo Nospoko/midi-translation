@@ -1,13 +1,14 @@
 import os.path
 import itertools
 
+import pandas as pd
 import torch
 import fortepyan as ff
 from tqdm import tqdm
-from tokenizer import Tokenizer
 from datasets import load_dataset
-from prepare_dataset import process_record, unprocessed_samples
 
+from data.tokenizer import Tokenizer
+from data.prepare_dataset import process_record, unprocessed_samples
 from data.quantizer import MidiQuantizer
 
 
@@ -21,6 +22,7 @@ class TokenizedMidiDataset:
         sequence_len: int = 128,
         device: str = "cpu",
     ):
+        self.split = split
         self.sequence_len = sequence_len
         self.device = device
 
@@ -45,7 +47,7 @@ class TokenizedMidiDataset:
     def _build(self):
         self.processed_records, self.unprocessed_records = self.load_dataset()
 
-        print("Creating samples ...")
+        print("Tokenizing ... ")
         for record in tqdm(self.processed_records):
             src_tokens = self.tokenizer_src(record)
             tgt_tokens = self.tokenizer_tgt(record)
@@ -71,18 +73,19 @@ class TokenizedMidiDataset:
             "dataset-"
             f"{self.quantizer.n_dstart_bins}-"
             f"{self.quantizer.n_duration_bins}-"
-            f"{self.quantizer.n_velocity_bins}.pt"
+            f"{self.quantizer.n_velocity_bins}-"
+            f"{self.split}.pt"
         )
         if os.path.isfile(path):
             records = torch.load(path)
-            processed_records = records['tokenized']
-            unprocessed_records = records['not_tokenized']
+            processed_records = records['quantized']
+            unprocessed_records = records['not_quantized']
         else:
             processed_records, unprocessed_records = self._build_dataset()
             torch.save(
                 {
-                    "tokenized": processed_records,
-                    "not_tokenized": unprocessed_records,
+                    "quantized": processed_records,
+                    "not_quantized": unprocessed_records,
                 },
                 f=path
             )
@@ -125,11 +128,20 @@ class TokenizedMidiDataset:
     def __getitem__(self, idx: int):
         return self.samples[idx]
 
+    def __len__(self):
+        return len(self.samples)
+
 
 def main():
     dataset = TokenizedMidiDataset()
     unprocessed_record = dataset.unprocessed_records[0]
     processed_record = dataset.processed_records[0]
+    processed_df = pd.DataFrame(processed_record)
+
+    quantized_record = dataset.quantizer.apply_quantization(processed_df)
+    quantized_record.pop('midi_filename')
+
+    print(quantized_record)
 
     src_tokens = dataset.tokenizer_src(processed_record)
     tgt_tokens = dataset.tokenizer_tgt(processed_record)
@@ -138,6 +150,7 @@ def main():
 
     print(
         f"Unprocessed record: \n {unprocessed_record} \n "
+        f"Quantized record: \n {quantized_record}" 
         f"Processed record: {processed_record} \n" 
         f"src_tokens: {src_tokens} \n" 
         f"tgt_tokens: {tgt_tokens} \n" 

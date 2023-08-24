@@ -7,7 +7,7 @@ import os
 
 import fortepyan as ff
 from tqdm import tqdm
-from quantizer import MidiQuantizer
+from data.quantizer import MidiQuantizer
 from datasets import Value, Dataset, Features, Sequence, DatasetDict, load_dataset
 
 
@@ -31,8 +31,7 @@ def process_dataset(
     return processed_records
 
 
-def unprocessed_samples(piece: ff.MidiPiece, sequence_len: int):
-    midi_filename = piece.source["midi_filename"]
+def unprocessed_samples(piece: ff.MidiPiece, sequence_len: int) -> list[dict]:
 
     record = []
 
