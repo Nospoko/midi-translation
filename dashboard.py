@@ -11,14 +11,25 @@ from data.dataset import TokenizedMidiDataset
 
 
 def main():
-    dataset = TokenizedMidiDataset(split="validation")
-    n_samples = 10
-
+    st.markdown("### Tokenization method:\n" "**n_dstart_bins    n_duration_bins    n_velocity_bins**")
+    bins = st.text_input(label="bins", value="3 3 3").split(" ")
+    n_dstart_bins, n_duration_bins, n_velocity_bins = bins
+    n_dstart_bins, n_duration_bins, n_velocity_bins = int(n_dstart_bins), int(n_duration_bins), int(n_velocity_bins)
+    bins = "-".join(bins)
+    print(bins)
+    print(n_velocity_bins)
+    dataset = TokenizedMidiDataset(
+        split="validation",
+        n_dstart_bins=n_dstart_bins,
+        n_duration_bins=n_duration_bins,
+        n_velocity_bins=n_velocity_bins,
+    )
+    n_samples = 5
     cols = st.columns(2)
     with cols[0]:
-        st.header("Source sample")
+        st.markdown("### Unchanged sample")
     with cols[1]:
-        st.header("Quantized sample")
+        st.markdown("### Quantized sample")
 
     indexes = torch.randint(0, len(dataset), [n_samples])
     for idx in indexes:
@@ -27,6 +38,7 @@ def main():
             processed=dataset.processed_records[idx],
             idx=idx,
             dataset=dataset,
+            bins=bins,
         )
 
         paths = piece_av_files(piece)
@@ -44,10 +56,7 @@ def main():
 
 
 def prepare_midi_pieces(
-    unprocessed: dict,
-    processed: dict,
-    idx: int,
-    dataset: TokenizedMidiDataset,
+    unprocessed: dict, processed: dict, idx: int, dataset: TokenizedMidiDataset, bins: str = "3-3-3"
 ) -> tuple[MidiPiece, MidiPiece]:
     processed_df = pd.DataFrame(processed)
 
@@ -66,11 +75,11 @@ def prepare_midi_pieces(
     processed_df["end"] -= start_time
 
     piece = MidiPiece(notes)
-    name = filename.split("/")[0] + "/" + str(idx) + "/real"
+    name = filename.split("/")[0] + "/" + str(idx) + "-real-" + bins
     piece.source["midi_filename"] = name + os.path.basename(filename)
 
     quantized_piece = MidiPiece(quantized_notes)
-    name = filename.split("/")[0] + "/" + str(idx) + "/quantized"
+    name = filename.split("/")[0] + "/" + str(idx) + "-quantized-" + bins
     quantized_piece.source["midi_filename"] = name + os.path.basename(filename)
     return piece, quantized_piece
 
