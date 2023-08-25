@@ -7,23 +7,41 @@ import os
 
 import fortepyan as ff
 from tqdm import tqdm
-from quantizer import MidiQuantizer
+from data.quantizer import MidiQuantizer
 from datasets import Value, Dataset, Features, Sequence, DatasetDict, load_dataset
 
 
-def process_dataset(dataset_path: str, split: str, sequence_len: int, quantizer: MidiQuantizer) -> list[dict]:
+def process_dataset(
+        dataset_path: str,
+        split: str,
+        sequence_len: int,
+        quantizer: MidiQuantizer
+) -> list[dict]:
     dataset = load_dataset(dataset_path, split=split)
 
     processed_records = []
-
     for record in tqdm(dataset, total=dataset.num_rows):
         # print(record)
         piece = ff.MidiPiece.from_huggingface(record)
+
         processed_record = process_record(piece, sequence_len, quantizer)
 
         processed_records += processed_record
 
     return processed_records
+
+
+def unprocessed_samples(piece: ff.MidiPiece, sequence_len: int) -> list[dict]:
+
+    record = []
+
+    step = sequence_len // 2
+    for subset in piece.df.rolling(window=sequence_len, step=step):
+        # rolling sometimes creates subsets with shorter sequence length, they are filtered here
+        if len(subset) != sequence_len:
+            continue
+        record.append(subset)
+    return record
 
 
 def process_record(piece: ff.MidiPiece, sequence_len: int, quantizer: MidiQuantizer) -> list[dict]:

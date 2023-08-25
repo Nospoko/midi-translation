@@ -20,7 +20,7 @@ class MidiQuantizer:
         self.n_dstart_bins = n_dstart_bins
         self.n_duration_bins = n_duration_bins
         self.n_velocity_bins = n_velocity_bins
-
+        self.samples = []
         self._build()
 
     def __rich_repr__(self):
@@ -48,6 +48,7 @@ class MidiQuantizer:
     def quantize_piece(self, piece: MidiPiece) -> MidiPiece:
         # Try not to overwrite anything
         df = piece.df.copy()
+        self.samples.append(df)
         source = dict(piece.source) | {"quantized": True}
 
         # Make the quantization

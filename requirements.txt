@@ -1,2 +1,10 @@
 datasets~=2.14.4
 pandas~=2.0.3
+
+torch~=2.0.1
+fortepyan~=0.2.4
+tqdm~=4.66.1
+PyYAML~=5.4.1
+numpy~=1.25.2
+matplotlib~=3.7.2
+streamlit~=1.25.0
