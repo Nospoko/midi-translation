@@ -44,7 +44,7 @@ class TokenizedMidiDataset:
 
     def load_samples(self) -> list[tuple[list[int], list[int]]]:
         path = (
-            f"data/datasets/samples-"
+            f"tmp/datasets/samples-"
             f"{self.quantizer.n_dstart_bins}-"
             f"{self.quantizer.n_duration_bins}-"
             f"{self.quantizer.n_velocity_bins}-"
@@ -74,7 +74,7 @@ class TokenizedMidiDataset:
 
     def load_dataset(self) -> tuple[list[dict], list[dict]]:
         path = (
-            "data/datasets/dataset-"
+            "tmp/datasets/dataset-"
             f"{self.quantizer.n_dstart_bins}-"
             f"{self.quantizer.n_duration_bins}-"
             f"{self.quantizer.n_velocity_bins}-"
