@@ -30,8 +30,8 @@ class TokenizedMidiDataset:
             n_velocity_bins=n_velocity_bins,
         )
 
-        self.tokenizer_src = Tokenizer(keys=["pitch", "dstart_bin"])
-        self.tokenizer_tgt = Tokenizer(keys=["duration_bin", "velocity_bin"])
+        self.tokenizer_src = Tokenizer(keys=["pitch", "dstart_bin", "duration_bin", "velocity_bin"])
+        self.tokenizer_tgt = Tokenizer(keys=['velocity'])
 
         self.dataset = load_dataset(path="roszcz/maestro-v1", split=split)
 
