@@ -37,7 +37,7 @@ class MidiQuantizer:
 
     def _load_bin_edges(self):
         # Hydra changes paths, this finds it back
-        artifacts_path = to_absolute_path("../artifacts/bin_edges.yaml")
+        artifacts_path = to_absolute_path("artifacts/bin_edges.yaml")
         with open(artifacts_path, "r") as f:
             bin_edges = yaml.safe_load(f)
 
