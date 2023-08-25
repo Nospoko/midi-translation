@@ -1,49 +1,31 @@
-import pandas as pd
-import torch
-import numpy as np
 import os
 
-from data.dataset import TokenizedMidiDataset
+import torch
+import numpy as np
+import pandas as pd
 import streamlit as st
 from fortepyan import MidiPiece
+
 from utils import piece_av_files
+from data.quantizer import MidiQuantizer
+from data.dataset import TokenizedMidiDataset
 
 
 def main():
-    dataset = TokenizedMidiDataset(split='validation')
+    dataset = TokenizedMidiDataset(split="validation")
     n_samples = 10
 
     cols = st.columns(2)
     indexes = torch.randint(0, len(dataset), [n_samples])
     for idx in indexes:
+        piece, quantized_piece = prepare_midi_pieces(
+            unprocessed=dataset.unprocessed_records[idx],
+            processed=dataset.processed_records[idx],
+            idx=idx,
+            quantizer=dataset.quantizer,
+        )
 
-        record = dataset.unprocessed_records[idx]
-
-        processed_record = dataset.processed_records[idx]
-        processed_df = pd.DataFrame(processed_record)
-
-        filename = processed_df.pop('midi_filename')[0]
-        print(filename)
-
-        notes = pd.DataFrame(record)
-        quantized_notes = dataset.quantizer.apply_quantization(processed_df)
-
-        start_time = np.min(notes["start"])
-
-        notes["start"] -= start_time
-        notes["end"] -= start_time
-        start_time = np.min(processed_df["start"])
-        processed_df["start"] -= start_time
-        processed_df["end"] -= start_time
-
-        piece = MidiPiece(notes)
-        name = filename.split("/")[0] + "/" + str(idx) + '/real'
-        piece.source["midi_filename"] = name + os.path.basename(filename)
         paths = piece_av_files(piece)
-
-        quantized_piece = MidiPiece(quantized_notes)
-        name = filename.split("/")[0] + "/" + str(idx) + '/quantized'
-        quantized_piece.source["midi_filename"] = name + os.path.basename(filename)
         quantized_piece_paths = piece_av_files(quantized_piece)
 
         with cols[0]:
@@ -57,5 +39,37 @@ def main():
             st.table(quantized_piece.source)
 
 
-if __name__ == '__main__':
+def prepare_midi_pieces(
+    unprocessed: dict,
+    processed: dict,
+    idx: int,
+    quantizer: MidiQuantizer,
+) -> tuple[MidiPiece, MidiPiece]:
+    processed_df = pd.DataFrame(processed)
+
+    filename = processed_df.pop("midi_filename")[0]
+    print(filename)
+
+    notes = pd.DataFrame(unprocessed)
+    quantized_notes = quantizer.apply_quantization(processed_df)
+
+    start_time = np.min(notes["start"])
+
+    notes["start"] -= start_time
+    notes["end"] -= start_time
+    start_time = np.min(processed_df["start"])
+    processed_df["start"] -= start_time
+    processed_df["end"] -= start_time
+
+    piece = MidiPiece(notes)
+    name = filename.split("/")[0] + "/" + str(idx) + "/real"
+    piece.source["midi_filename"] = name + os.path.basename(filename)
+
+    quantized_piece = MidiPiece(quantized_notes)
+    name = filename.split("/")[0] + "/" + str(idx) + "/quantized"
+    quantized_piece.source["midi_filename"] = name + os.path.basename(filename)
+    return piece, quantized_piece
+
+
+if __name__ == "__main__":
     main()
