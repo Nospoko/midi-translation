@@ -1,15 +1,15 @@
 import os.path
 import itertools
 
-import pandas as pd
 import torch
+import pandas as pd
 import fortepyan as ff
 from tqdm import tqdm
 from datasets import load_dataset
 
-from data.tokenizer import Tokenizer
-from data.prepare_dataset import process_record, unprocessed_samples
 from data.quantizer import MidiQuantizer
+from data.tokenizer import Tokenizer, VelocityTokenizer
+from data.prepare_dataset import process_record, unprocessed_samples
 
 
 class TokenizedMidiDataset:
@@ -17,8 +17,8 @@ class TokenizedMidiDataset:
         self,
         split: str = "train",
         n_dstart_bins: int = 3,
-        n_duration_bins: int = 10,
-        n_velocity_bins: int = 10,
+        n_duration_bins: int = 3,
+        n_velocity_bins: int = 3,
         sequence_len: int = 128,
         device: str = "cpu",
     ):
@@ -32,8 +32,8 @@ class TokenizedMidiDataset:
             n_velocity_bins=n_velocity_bins,
         )
 
-        self.tokenizer_src = Tokenizer(keys=["pitch", "dstart_bin"])
-        self.tokenizer_tgt = Tokenizer(keys=["duration_bin", "velocity_bin"])
+        self.tokenizer_src = Tokenizer(keys=["pitch", "dstart_bin", "duration_bin", "velocity_bin"])
+        self.tokenizer_tgt = VelocityTokenizer()
 
         self.dataset = load_dataset(path="roszcz/maestro-v1", split=split)
 
@@ -41,30 +41,22 @@ class TokenizedMidiDataset:
 
         self.processed_records = []
         self.samples = []
-
+        self.processed_records, self.unprocessed_records = self.load_dataset()
         self._build()
 
     def _build(self):
-        self.processed_records, self.unprocessed_records = self.load_dataset()
+        pbar = tqdm(zip(self.processed_records, self.unprocessed_records), total=len(self.processed_records))
 
         print("Tokenizing ... ")
-        for record in tqdm(self.processed_records):
-            src_tokens = self.tokenizer_src(record)
-            tgt_tokens = self.tokenizer_tgt(record)
+        for processed_record, unprocessed_record in pbar:
+            src_tokens = self.tokenizer_src(processed_record)
+            tgt_tokens = self.tokenizer_tgt(unprocessed_record)
 
             src_processed = [self.src_vocab.index(token) for token in src_tokens]
             tgt_processed = [self.tgt_vocab.index(token) for token in tgt_tokens]
 
-            bs_id = torch.tensor([0], device=self.device)  # <s> token id
-            eos_id = torch.tensor([1], device=self.device)  # </s> token id
-            src = torch.cat(
-                [bs_id, torch.tensor(src_processed, dtype=torch.int64, device=self.device), eos_id],
-                0,
-            )
-            tgt = torch.cat(
-                [bs_id, torch.tensor(tgt_processed, dtype=torch.int64, device=self.device), eos_id],
-                0,
-            )
+            src = torch.tensor(src_processed, dtype=torch.int64, device=self.device)
+            tgt = torch.tensor(tgt_processed, dtype=torch.int64, device=self.device)
 
             self.samples.append((src, tgt))
 
@@ -78,8 +70,8 @@ class TokenizedMidiDataset:
         )
         if os.path.isfile(path):
             records = torch.load(path)
-            processed_records = records['quantized']
-            unprocessed_records = records['not_quantized']
+            processed_records = records["quantized"]
+            unprocessed_records = records["not_quantized"]
         else:
             processed_records, unprocessed_records = self._build_dataset()
             torch.save(
@@ -87,14 +79,14 @@ class TokenizedMidiDataset:
                     "quantized": processed_records,
                     "not_quantized": unprocessed_records,
                 },
-                f=path
+                f=path,
             )
         return processed_records, unprocessed_records
 
     def _build_dataset(self) -> tuple[list[dict], list[dict]]:
-
         processed_records = []
         unprocessed_records = []
+
         print("Building a dataset ...")
         for record in tqdm(self.dataset, total=self.dataset.num_rows):
             # print(record)
@@ -112,15 +104,19 @@ class TokenizedMidiDataset:
         vocab_src, vocab_tgt = ["<s>", "</s>"], ["<s>", "</s>"]
 
         # every combination of pitch + dstart
-        product = itertools.product(range(21, 109), range(self.quantizer.n_dstart_bins))
-        for pitch, dstart in product:
-            key = f"{pitch}-{dstart}"
+        product = itertools.product(
+            range(21, 109),
+            range(self.quantizer.n_dstart_bins),
+            range(self.quantizer.n_duration_bins),
+            range(self.quantizer.n_velocity_bins),
+        )
+        for pitch, dstart, duration, velocity in product:
+            key = f"{pitch}-{dstart}-{duration}-{velocity}"
             vocab_src.append(key)
 
         # every combination of duration + velocity
-        product = itertools.product(range(self.quantizer.n_duration_bins), range(self.quantizer.n_velocity_bins))
-        for duration, velocity in product:
-            key = f"{duration}-{velocity}"
+        for velocity in range(128):
+            key = f"{velocity}"
             vocab_tgt.append(key)
 
         return vocab_src, vocab_tgt
@@ -133,27 +129,27 @@ class TokenizedMidiDataset:
 
 
 def main():
-    dataset = TokenizedMidiDataset()
+    dataset = TokenizedMidiDataset(split="validation")
+
     unprocessed_record = dataset.unprocessed_records[0]
     processed_record = dataset.processed_records[0]
     processed_df = pd.DataFrame(processed_record)
+    unprocessed_df = pd.DataFrame(unprocessed_record)
 
     quantized_record = dataset.quantizer.apply_quantization(processed_df)
-    quantized_record.pop('midi_filename')
+    quantized_record.pop("midi_filename")
 
-    print(quantized_record)
-
-    src_tokens = dataset.tokenizer_src(processed_record)
-    tgt_tokens = dataset.tokenizer_tgt(processed_record)
+    src_tokens = dataset.tokenizer_src(processed_df)
+    tgt_tokens = dataset.tokenizer_tgt(unprocessed_df)
 
     sample = dataset[0]
 
     print(
         f"Unprocessed record: \n {unprocessed_record} \n "
-        f"Quantized record: \n {quantized_record}" 
-        f"Processed record: {processed_record} \n" 
-        f"src_tokens: {src_tokens} \n" 
-        f"tgt_tokens: {tgt_tokens} \n" 
+        f"Quantized record: \n {quantized_record}"
+        f"Processed record: {processed_record} \n"
+        f"src_tokens: {src_tokens} \n"
+        f"tgt_tokens: {tgt_tokens} \n"
         f"sample: {sample}"
     )
 
