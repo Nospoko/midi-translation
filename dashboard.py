@@ -7,7 +7,6 @@ import streamlit as st
 from fortepyan import MidiPiece
 
 from utils import piece_av_files
-from data.quantizer import MidiQuantizer
 from data.dataset import TokenizedMidiDataset
 
 
@@ -16,13 +15,18 @@ def main():
     n_samples = 10
 
     cols = st.columns(2)
+    with cols[0]:
+        st.header("Source sample")
+    with cols[1]:
+        st.header("Quantized sample")
+
     indexes = torch.randint(0, len(dataset), [n_samples])
     for idx in indexes:
         piece, quantized_piece = prepare_midi_pieces(
             unprocessed=dataset.unprocessed_records[idx],
             processed=dataset.processed_records[idx],
             idx=idx,
-            quantizer=dataset.quantizer,
+            dataset=dataset,
         )
 
         paths = piece_av_files(piece)
@@ -43,7 +47,7 @@ def prepare_midi_pieces(
     unprocessed: dict,
     processed: dict,
     idx: int,
-    quantizer: MidiQuantizer,
+    dataset: TokenizedMidiDataset,
 ) -> tuple[MidiPiece, MidiPiece]:
     processed_df = pd.DataFrame(processed)
 
@@ -51,7 +55,7 @@ def prepare_midi_pieces(
     print(filename)
 
     notes = pd.DataFrame(unprocessed)
-    quantized_notes = quantizer.apply_quantization(processed_df)
+    quantized_notes = dataset.quantizer.apply_quantization(processed_df)
 
     start_time = np.min(notes["start"])
 

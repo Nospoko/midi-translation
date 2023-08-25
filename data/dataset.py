@@ -39,30 +39,42 @@ class TokenizedMidiDataset:
 
         self.src_vocab, self.tgt_vocab = self._build_vocab()
 
-        self.processed_records = []
-        self.samples = []
         self.processed_records, self.unprocessed_records = self.load_dataset()
-        self._build()
+        self.samples = self.load_samples()
 
-    def _build(self):
-        pbar = tqdm(zip(self.processed_records, self.unprocessed_records), total=len(self.processed_records))
-
-        print("Tokenizing ... ")
-        for processed_record, unprocessed_record in pbar:
-            src_tokens = self.tokenizer_src(processed_record)
-            tgt_tokens = self.tokenizer_tgt(unprocessed_record)
-
-            src_processed = [self.src_vocab.index(token) for token in src_tokens]
-            tgt_processed = [self.tgt_vocab.index(token) for token in tgt_tokens]
-
-            src = torch.tensor(src_processed, dtype=torch.int64, device=self.device)
-            tgt = torch.tensor(tgt_processed, dtype=torch.int64, device=self.device)
-
-            self.samples.append((src, tgt))
-
-    def load_dataset(self):
+    def load_samples(self) -> list[tuple[list[int], list[int]]]:
         path = (
-            "dataset-"
+            f"data/datasets/samples-"
+            f"{self.quantizer.n_dstart_bins}-"
+            f"{self.quantizer.n_duration_bins}-"
+            f"{self.quantizer.n_velocity_bins}-"
+            f"{self.split}-"
+            f"bins-to-vel.pt"
+        )
+        samples = []
+        if os.path.isfile(path):
+            samples = torch.load(path)
+        else:
+            pbar = tqdm(zip(self.processed_records, self.unprocessed_records), total=len(self.processed_records))
+
+            print("Tokenizing ... ")
+            for processed_record, unprocessed_record in pbar:
+                src_tokens = self.tokenizer_src(processed_record)
+                tgt_tokens = self.tokenizer_tgt(unprocessed_record)
+
+                src_processed = [self.src_vocab.index(token) for token in src_tokens]
+                tgt_processed = [self.tgt_vocab.index(token) for token in tgt_tokens]
+
+                src = torch.tensor(src_processed, dtype=torch.int64, device=self.device)
+                tgt = torch.tensor(tgt_processed, dtype=torch.int64, device=self.device)
+
+                samples.append((src, tgt))
+            torch.save(samples, path)
+        return samples
+
+    def load_dataset(self) -> tuple[list[dict], list[dict]]:
+        path = (
+            "data/datasets/dataset-"
             f"{self.quantizer.n_dstart_bins}-"
             f"{self.quantizer.n_duration_bins}-"
             f"{self.quantizer.n_velocity_bins}-"
@@ -129,7 +141,7 @@ class TokenizedMidiDataset:
 
 
 def main():
-    dataset = TokenizedMidiDataset(split="validation")
+    dataset = TokenizedMidiDataset(split="validation", n_dstart_bins=3, n_duration_bins=3, n_velocity_bins=3)
 
     unprocessed_record = dataset.unprocessed_records[0]
     processed_record = dataset.processed_records[0]
@@ -142,12 +154,15 @@ def main():
     src_tokens = dataset.tokenizer_src(processed_df)
     tgt_tokens = dataset.tokenizer_tgt(unprocessed_df)
 
+    src_untokenized = dataset.tokenizer_src.untokenize(src_tokens)
+
     sample = dataset[0]
 
     print(
         f"Unprocessed record: \n {unprocessed_record} \n "
         f"Quantized record: \n {quantized_record}"
         f"Processed record: {processed_record} \n"
+        f"untokenized record: {src_untokenized} \n"
         f"src_tokens: {src_tokens} \n"
         f"tgt_tokens: {tgt_tokens} \n"
         f"sample: {sample}"
