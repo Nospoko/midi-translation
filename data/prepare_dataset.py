@@ -7,16 +7,12 @@ import os
 
 import fortepyan as ff
 from tqdm import tqdm
-from data.quantizer import MidiQuantizer
 from datasets import Value, Dataset, Features, Sequence, DatasetDict, load_dataset
 
+from data.quantizer import MidiQuantizer
 
-def process_dataset(
-        dataset_path: str,
-        split: str,
-        sequence_len: int,
-        quantizer: MidiQuantizer
-) -> list[dict]:
+
+def process_dataset(dataset_path: str, split: str, sequence_len: int, quantizer: MidiQuantizer) -> list[dict]:
     dataset = load_dataset(dataset_path, split=split)
 
     processed_records = []
@@ -32,15 +28,23 @@ def process_dataset(
 
 
 def unprocessed_samples(piece: ff.MidiPiece, sequence_len: int) -> list[dict]:
-
     record = []
-
+    midi_filename = piece.source["midi_filename"]
     step = sequence_len // 2
-    for subset in piece.df.rolling(window=sequence_len, step=step):
+    df = piece.df.copy()
+    for subset in df.rolling(window=sequence_len, step=step):
         # rolling sometimes creates subsets with shorter sequence length, they are filtered here
         if len(subset) != sequence_len:
             continue
-        record.append(subset)
+        sequence = {
+            "midi_filename": midi_filename,
+            "pitch": subset.pitch.values,
+            "start": subset.start.values,
+            "end": subset.end.values,
+            "duration": subset.duration.values,
+            "velocity": subset.velocity.values,
+        }
+        record.append(sequence)
     return record
 
 
