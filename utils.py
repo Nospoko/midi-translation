@@ -27,3 +27,11 @@ def piece_av_files(piece: MidiPiece) -> dict:
         "pianoroll_path": pianoroll_path,
     }
     return paths
+
+
+def rate(step: int, model_size: int, factor: float, warmup: int) -> float:
+    # we have to default the step to 1 for LambdaLR function
+    # to avoid zero raising to negative power.
+    if step == 0:
+        step = 1
+    return factor * (model_size ** (-0.5) * min(step ** (-0.5), step * warmup ** (-1.5)))

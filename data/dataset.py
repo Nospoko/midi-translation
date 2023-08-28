@@ -37,7 +37,7 @@ class TokenizedMidiDataset:
 
         self.dataset = load_dataset(path="roszcz/maestro-v1", split=split)
 
-        self.src_vocab, self.tgt_vocab = self._build_vocab()
+        self.src_vocab, self.tgt_vocab = self.build_vocab()
 
         self.processed_records, self.unprocessed_records = self.load_dataset()
         self.samples = self.load_samples()
@@ -112,8 +112,8 @@ class TokenizedMidiDataset:
 
         return processed_records, unprocessed_records
 
-    def _build_vocab(self) -> tuple[list[str], list[str]]:
-        vocab_src, vocab_tgt = ["<s>", "</s>"], ["<s>", "</s>"]
+    def build_vocab(self) -> tuple[list[str], list[str]]:
+        vocab_src, vocab_tgt = ["<s>", "<blank>", "</s>"], ["<s>", "<blank>", "</s>"]
 
         # every combination of pitch + dstart
         product = itertools.product(
