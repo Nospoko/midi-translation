@@ -34,8 +34,6 @@ def main(cfg: DictConfig):
         device=cfg.device,
     )
 
-
-
     model = train_model(train_data, val_data, cfg)
     path = f"models/{cfg.file_prefix}-{cfg.run_name}-final.pt"
     torch.save(
@@ -103,7 +101,7 @@ def train_model(
         print(f"Epoch {epoch}", flush=True)
 
         # Train model for one epoch
-        t_loss, train_state = train_epoch(
+        t_loss = train_epoch(
             dataloader=train_dataloader,
             model=model,
             criterion=criterion,
