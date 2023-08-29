@@ -16,6 +16,7 @@ def main():
     n_dstart_bins, n_duration_bins, n_velocity_bins = bins
     n_dstart_bins, n_duration_bins, n_velocity_bins = int(n_dstart_bins), int(n_duration_bins), int(n_velocity_bins)
     bins = "-".join(bins)
+
     print(bins)
     print(n_velocity_bins)
     dataset = TokenizedMidiDataset(

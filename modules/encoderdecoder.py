@@ -1,5 +1,4 @@
 import torch
-import pandas as pd
 import torch.nn as nn
 from torch.nn.functional import log_softmax
 
@@ -58,4 +57,3 @@ def subsequent_mask(size: int):
     attn_shape = (1, size, size)
     subsequent_mask = torch.triu(torch.ones(attn_shape), diagonal=1).type(torch.uint8)
     return subsequent_mask == 0
-

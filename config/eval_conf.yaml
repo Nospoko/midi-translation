@@ -1,0 +1,10 @@
+run_name: ""
+model_epoch: "final"
+
+n_examples: 5
+random_examples: False
+device: "cpu"
+
+tasks:
+  val_epoch: True
+  translation: True

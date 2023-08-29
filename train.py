@@ -1,41 +1,47 @@
 import time
 from typing import Callable, Iterable
-from utils import rate
+
 import hydra
 import torch
 import einops
 import torch.nn as nn
-from data.batch import Batch
 from tqdm import tqdm
-from data.dataset import TokenizedMidiDataset
+from torch.utils.data import DataLoader
 from omegaconf import OmegaConf, DictConfig
 from torch.optim.lr_scheduler import LambdaLR
-from torch.utils.data import DataLoader
+
 import wandb
+from utils import rate
+from data.batch import Batch
 from model import make_model
+from data.dataset import TokenizedMidiDataset
 from modules.label_smoothing import LabelSmoothing
+
 
 @hydra.main(version_base=None, config_path="config", config_name="conf")
 def main(cfg: DictConfig):
+    n_dstart_bins, n_duration_bins, n_velocity_bins = cfg.bins.split(" ")
+    n_dstart_bins, n_duration_bins, n_velocity_bins = int(n_dstart_bins), int(n_duration_bins), int(n_velocity_bins)
+    bins = "-".join(cfg.bins)
     train_data = TokenizedMidiDataset(
-        split='train',
-        n_dstart_bins=3,
-        n_velocity_bins=3,
-        n_duration_bins=3,
+        split="train",
+        n_dstart_bins=n_dstart_bins,
+        n_velocity_bins=n_velocity_bins,
+        n_duration_bins=n_duration_bins,
         sequence_len=cfg.sequence_size,
         device=cfg.device,
     )
     val_data = TokenizedMidiDataset(
-        split='validation',
-        n_dstart_bins=3,
-        n_velocity_bins=3,
-        n_duration_bins=3,
+        split="validation",
+        n_dstart_bins=n_dstart_bins,
+        n_velocity_bins=n_velocity_bins,
+        n_duration_bins=n_duration_bins,
         sequence_len=cfg.sequence_size,
         device=cfg.device,
     )
 
     model = train_model(train_data, val_data, cfg)
-    path = f"models/{cfg.file_prefix}-{cfg.run_name}-final.pt"
+    path = f"models/{bins}-{cfg.file_prefix}-{cfg.run_name}-final.pt"
     torch.save(
         {
             "model_state_dict": model.state_dict(),
@@ -43,7 +49,7 @@ def main(cfg: DictConfig):
             "input_size": len(train_data.src_vocab),
             "output_size": len(train_data.tgt_vocab),
         },
-        path
+        path,
     )
 
 
@@ -112,8 +118,9 @@ def train_model(
             pad_idx=pad_idx,
         )
 
+        bins = "-".join(cfg.bins)
         # Save checkpoint after each epoch
-        file_path = f"models/{cfg.file_prefix}-{cfg.run_name}-{epoch}.pt"
+        file_path = f"models/{bins}-{cfg.file_prefix}-{cfg.run_name}-{epoch}.pt"
         torch.save(
             {
                 "model_state_dict": model.state_dict(),
@@ -128,12 +135,8 @@ def train_model(
         with torch.no_grad():
             model.eval()
             # Evaluate the model on validation set
-            v_loss = val_epoch(
-                dataloader=val_dataloader,
-                model=model,
-                criterion=criterion,
-                pad_idx=pad_idx
-            )
+            v_loss = val_epoch(dataloader=val_dataloader, model=model, criterion=criterion, pad_idx=pad_idx)
+            print(float(v_loss))
 
         # Log validation and training losses
         wandb.log({"val/loss_epoch": v_loss, "train/loss_epoch": t_loss})
@@ -148,10 +151,8 @@ def train_epoch(
     lr_scheduler: LambdaLR,
     accum_iter: int = 1,
     log_frequency: int = 10,
-    sequence_size: int = 128,
     pad_idx: int = 2,
 ) -> float:
-
     start = time.time()
     total_loss = 0
     tokens = 0
@@ -159,7 +160,6 @@ def train_epoch(
     it = 0
 
     # create progress bar
-
     steps = len(dataloader)
     pbar = tqdm(dataloader, total=steps)
 
@@ -210,8 +210,7 @@ def val_epoch(
     dataloader: Iterable,
     model: nn.Module,
     criterion: Callable,
-    sequence_size: int = 128,
-    pad_idx: int = 2
+    pad_idx: int = 2,
 ) -> float:
     total_tokens = 0
     total_loss = 0
