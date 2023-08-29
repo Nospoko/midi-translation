@@ -35,7 +35,7 @@ class TokenizedMidiDataset:
         self.tokenizer_src = Tokenizer(keys=["pitch", "dstart_bin", "duration_bin", "velocity_bin"])
         self.tokenizer_tgt = VelocityTokenizer()
 
-        self.dataset = load_dataset(path="roszcz/maestro-v1", split=split + "[:1%]")
+        self.dataset = load_dataset(path="roszcz/maestro-v1", split=split)
 
         self.src_vocab, self.tgt_vocab = self.build_vocab()
 
