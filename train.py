@@ -22,7 +22,7 @@ from modules.label_smoothing import LabelSmoothing
 def main(cfg: DictConfig):
     n_dstart_bins, n_duration_bins, n_velocity_bins = cfg.bins.split(" ")
     n_dstart_bins, n_duration_bins, n_velocity_bins = int(n_dstart_bins), int(n_duration_bins), int(n_velocity_bins)
-    bins = "-".join(cfg.bins.split(' '))
+    bins = "-".join(cfg.bins.split(" "))
     train_data = TokenizedMidiDataset(
         split="train",
         n_dstart_bins=n_dstart_bins,
@@ -118,7 +118,7 @@ def train_model(
             pad_idx=pad_idx,
         )
 
-        bins = "-".join(cfg.bins.split(' '))
+        bins = "-".join(cfg.bins.split(" "))
         # Save checkpoint after each epoch
         file_path = f"models/{bins}-{cfg.file_prefix}-{cfg.run_name}-{epoch}.pt"
         torch.save(

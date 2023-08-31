@@ -7,4 +7,4 @@ device: "cpu"
 
 tasks:
   val_epoch: True
-  translation: True
+  translation: False
