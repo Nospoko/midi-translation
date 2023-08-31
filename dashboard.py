@@ -95,7 +95,7 @@ def model_predictions_review():
 
         # create quantized piece with predicted velocities
         pred_piece = MidiPiece(pred_piece_df)
-        pred_piece.source = true_piece.source
+        pred_piece.source = true_piece.source.copy()
 
         name = filename.split("/")[0] + "/" + str(idx + start_index) + "-predicted-" + bins
         pred_piece.source["midi_filename"] = name + os.path.basename(filename)
