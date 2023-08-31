@@ -78,6 +78,7 @@ class TokenizedMidiDataset:
             f"{self.quantizer.n_dstart_bins}-"
             f"{self.quantizer.n_duration_bins}-"
             f"{self.quantizer.n_velocity_bins}-"
+            f"{self.sequence_len}-"
             f"{self.split}.pt"
         )
         if os.path.isfile(path):
