@@ -4,6 +4,7 @@ import hydra
 import torch
 import torch.nn as nn
 from omegaconf import OmegaConf
+from datasets import load_dataset
 from torch.utils.data import DataLoader
 
 from train import val_epoch
@@ -22,13 +23,13 @@ def main(cfg):
         device=cfg.device,
     )
     train_cfg = OmegaConf.create(checkpoint["cfg"])
+    dataset = load_dataset("roszcz/maestro-v1", split="test")
     val_data = BinsToVelocityDataset(
-        split="test",
+        dataset=dataset,
         n_dstart_bins=3,
         n_velocity_bins=3,
         n_duration_bins=3,
         sequence_len=train_cfg.sequence_size,
-        device=cfg.device,
     )
 
     dataloader = DataLoader(val_data, batch_size=train_cfg.train.batch_size)

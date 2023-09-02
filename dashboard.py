@@ -6,6 +6,7 @@ import pandas as pd
 import streamlit as st
 from fortepyan import MidiPiece
 from omegaconf import OmegaConf
+from datasets import load_dataset
 
 from model import make_model
 from eval import make_examples
@@ -50,9 +51,10 @@ def model_predictions_review():
     # read tokenization method from train_cfg
     n_dstart_bins, n_duration_bins, n_velocity_bins = train_cfg.bins.split(" ")
     n_dstart_bins, n_duration_bins, n_velocity_bins = int(n_dstart_bins), int(n_duration_bins), int(n_velocity_bins)
+    hf_dataset = load_dataset("roszcz/maestro-v1", split="test")
 
     dataset = BinsToVelocityDataset(
-        split="test",
+        hf_dataset,
         n_dstart_bins=n_dstart_bins,
         n_duration_bins=n_duration_bins,
         n_velocity_bins=n_velocity_bins,

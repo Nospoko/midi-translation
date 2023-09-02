@@ -10,6 +10,7 @@ import einops
 import pandas
 import torch.nn as nn
 from tqdm import tqdm
+from datasets import load_dataset
 from torch.utils.data import DataLoader
 from omegaconf import OmegaConf, DictConfig
 from torch.optim.lr_scheduler import LambdaLR
@@ -39,8 +40,9 @@ def load_datasets(cfg: DictConfig):
     if os.path.exists(train_dataset_cache_path):
         train_dataset = pandas.read_pickle(train_dataset_cache_path)
     else:
+        dataset = load_dataset("roszcz/maestro-v1", split="train")
         train_dataset = BinsToVelocityDataset(
-            split="train",
+            dataset=dataset,
             n_dstart_bins=n_dstart_bins,
             n_velocity_bins=n_velocity_bins,
             n_duration_bins=n_duration_bins,
@@ -51,8 +53,10 @@ def load_datasets(cfg: DictConfig):
     if os.path.exists(val_dataset_cache_path):
         val_dataset = pandas.read_pickle(val_dataset_cache_path)
     else:
+        dataset = load_dataset("roszcz/maestro-v1", split="validation")
+
         val_dataset = BinsToVelocityDataset(
-            split="validation",
+            dataset=dataset,
             n_dstart_bins=n_dstart_bins,
             n_velocity_bins=n_velocity_bins,
             n_duration_bins=n_duration_bins,

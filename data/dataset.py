@@ -4,7 +4,7 @@ import torch
 import pandas as pd
 import fortepyan as ff
 from tqdm import tqdm
-from datasets import load_dataset
+from datasets import Dataset
 
 from data.quantizer import MidiQuantizer
 from data.tokenizer import Tokenizer, VelocityTokenizer
@@ -16,25 +16,23 @@ class TokenizedMidiDataset:
         self,
         src_tokenizer: Tokenizer,
         tgt_tokenizer: Tokenizer,
-        split: str = "train",
+        dataset: Dataset,
         n_dstart_bins: int = 3,
         n_duration_bins: int = 3,
         n_velocity_bins: int = 3,
         sequence_len: int = 128,
     ):
-        self.split = split
         self.sequence_len = sequence_len
+        self.tokenizer_src = src_tokenizer
+        self.tokenizer_tgt = tgt_tokenizer
+
+        self.dataset = dataset
 
         self.quantizer = MidiQuantizer(
             n_dstart_bins=n_dstart_bins,
             n_duration_bins=n_duration_bins,
             n_velocity_bins=n_velocity_bins,
         )
-
-        self.tokenizer_src = src_tokenizer
-        self.tokenizer_tgt = tgt_tokenizer
-
-        self.dataset = load_dataset(path="roszcz/maestro-v1", split=split)
 
         self.src_vocab, self.tgt_vocab = self.build_vocab()
 
@@ -116,7 +114,7 @@ class TokenizedMidiDataset:
 class BinsToVelocityDataset(TokenizedMidiDataset):
     def __init__(
         self,
-        split: str = "train",
+        dataset: Dataset,
         n_dstart_bins: int = 3,
         n_duration_bins: int = 3,
         n_velocity_bins: int = 3,
@@ -128,7 +126,7 @@ class BinsToVelocityDataset(TokenizedMidiDataset):
         super().__init__(
             src_tokenizer=tokenizer_src,
             tgt_tokenizer=tokenizer_tgt,
-            split=split,
+            dataset=dataset,
             n_dstart_bins=n_dstart_bins,
             n_duration_bins=n_duration_bins,
             n_velocity_bins=n_velocity_bins,
