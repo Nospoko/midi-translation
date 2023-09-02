@@ -138,13 +138,11 @@ def model_predictions_review():
 
 def tokenization_review_dashboard():
     st.markdown("### Tokenization method:\n" "**n_dstart_bins    n_duration_bins    n_velocity_bins**")
-    bins = st.text_input(label="bins", value="3 3 3").split(" ")
-    n_dstart_bins, n_duration_bins, n_velocity_bins = bins
-    n_dstart_bins, n_duration_bins, n_velocity_bins = int(n_dstart_bins), int(n_duration_bins), int(n_velocity_bins)
-    bins = "-".join(bins)
-    dataset_cfg = OmegaConf.create({"bins": bins, "sequence_len": 128})
+    bins = st.text_input(label="bins", value="3 3 3")
+    dataset_cfg = OmegaConf.create({"bins": bins, "sequence_size": 128})
 
     dataset = load_test_dataset(dataset_cfg)
+    bins = bins.replace(" ", "-")
     n_samples = 5
     cols = st.columns(2)
     with cols[0]:

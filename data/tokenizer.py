@@ -45,16 +45,12 @@ class VelocityTokenizer(Tokenizer):
         super().__init__(keys=["velocity"])
 
     def untokenize(self, tokens: list[str]) -> pd.DataFrame:
-        sample = pd.DataFrame(columns=["velocity"])
-
+        values = []
         for token in tokens:
             if token in self.specials:
                 continue
             value = eval(token)
-            sample = pd.concat(
-                [sample, pd.DataFrame([[value]], columns=["velocity"])],
-                axis="rows",
-                ignore_index=True,
-            )
+            values.append(value)
+        sample = pd.DataFrame(values, columns=["velocity"])
 
         return sample
