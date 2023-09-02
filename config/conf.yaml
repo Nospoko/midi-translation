@@ -6,10 +6,11 @@ train:
   distributed: False
   label_smoothing: 0.1
 
-
-bins: "3 3 3"
+dataset:
+  bins: "3 3 3"
+  sequence_size: 128
+  
 device: "cpu"
-sequence_size: 128
 warmup: 3000
 log_frequency: 10
 file_prefix: "to_vel_model"

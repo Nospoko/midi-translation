@@ -1,7 +1,11 @@
+import hashlib
+import json
+import os
 import time
 from typing import Callable, Iterable
 
 import hydra
+import pandas
 import torch
 import einops
 import torch.nn as nn
@@ -16,29 +20,53 @@ from data.batch import Batch
 from model import make_model
 from data.dataset import BinsToVelocityDataset
 from modules.label_smoothing import LabelSmoothing
+import pickle
+
+def load_datasets(cfg: DictConfig):
+    n_dstart_bins, n_duration_bins, n_velocity_bins = cfg.bins.split(" ")
+    n_dstart_bins, n_duration_bins, n_velocity_bins = int(n_dstart_bins), int(n_duration_bins), int(n_velocity_bins)
+
+    config_hash = hashlib.sha256()
+    config_string = json.dumps(OmegaConf.to_container(cfg))
+    config_hash.update(config_string.encode())
+    config_hash = config_hash.hexdigest()
+    cache_dir = "tmp/datasets"
+    train_dataset_cache_file = f"{config_hash}_train.pkl"
+
+    val_dataset_cache_file = f"{config_hash}_val.pkl"
+    train_dataset_cache_path = os.path.join(cache_dir, train_dataset_cache_file)
+    val_dataset_cache_path = os.path.join(cache_dir, val_dataset_cache_file)
+    if os.path.exists(train_dataset_cache_path):
+        train_dataset = pandas.read_pickle(train_dataset_cache_path)
+    else:
+        train_dataset = BinsToVelocityDataset(
+            split="train",
+            n_dstart_bins=n_dstart_bins,
+            n_velocity_bins=n_velocity_bins,
+            n_duration_bins=n_duration_bins,
+            sequence_len=cfg.sequence_size,
+        )
+        pandas.to_pickle(train_dataset, train_dataset_cache_path)
+
+    if os.path.exists(val_dataset_cache_path):
+        val_dataset = pandas.read_pickle(val_dataset_cache_path)
+    else:
+        val_dataset = BinsToVelocityDataset(
+            split="validation",
+            n_dstart_bins=n_dstart_bins,
+            n_velocity_bins=n_velocity_bins,
+            n_duration_bins=n_duration_bins,
+            sequence_len=cfg.sequence_size,
+        )
+        pandas.to_pickle(val_dataset, val_dataset_cache_path)
+    return train_dataset, val_dataset
 
 
 @hydra.main(version_base=None, config_path="config", config_name="conf")
 def main(cfg: DictConfig):
-    n_dstart_bins, n_duration_bins, n_velocity_bins = cfg.bins.split(" ")
-    n_dstart_bins, n_duration_bins, n_velocity_bins = int(n_dstart_bins), int(n_duration_bins), int(n_velocity_bins)
-    bins = "-".join(cfg.bins.split(" "))
-    train_data = BinsToVelocityDataset(
-        split="train",
-        n_dstart_bins=n_dstart_bins,
-        n_velocity_bins=n_velocity_bins,
-        n_duration_bins=n_duration_bins,
-        sequence_len=cfg.sequence_size,
-        device=cfg.device,
-    )
-    val_data = BinsToVelocityDataset(
-        split="validation",
-        n_dstart_bins=n_dstart_bins,
-        n_velocity_bins=n_velocity_bins,
-        n_duration_bins=n_duration_bins,
-        sequence_len=cfg.sequence_size,
-        device=cfg.device,
-    )
+    bins = "-".join(cfg.dataset.bins.split(" "))
+
+    train_data, val_data = load_datasets(cfg.dataset)
 
     model = train_model(train_data, val_data, cfg)
     path = f"models/{bins}-{cfg.file_prefix}-{cfg.run_name}-final.pt"
@@ -152,6 +180,7 @@ def train_epoch(
     accum_iter: int = 1,
     log_frequency: int = 10,
     pad_idx: int = 2,
+    device="cpu",
 ) -> float:
     start = time.time()
     total_loss = 0
@@ -165,6 +194,9 @@ def train_epoch(
 
     for b in pbar:
         batch = Batch(b[0], b[1], pad=pad_idx)
+
+        batch.to(device)
+
         encoded_decoded = model.forward(batch.src, batch.tgt, batch.src_mask, batch.tgt_mask)
         out = model.generator(encoded_decoded)
 
@@ -211,6 +243,7 @@ def val_epoch(
     model: nn.Module,
     criterion: Callable,
     pad_idx: int = 2,
+    device: str = "cpu"
 ) -> float:
     total_tokens = 0
     total_loss = 0
@@ -218,6 +251,8 @@ def val_epoch(
 
     for b in tqdm(dataloader):
         batch = Batch(b[0], b[1], pad=pad_idx)
+        batch.to(device)
+
         encoded_decoded = model.forward(batch.src, batch.tgt, batch.src_mask, batch.tgt_mask)
         out = model.generator(encoded_decoded)
 

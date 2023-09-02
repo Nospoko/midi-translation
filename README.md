@@ -1,4 +1,4 @@
-## [MIDI Translation Transformer](https://sacrebleu.atlassian.net/jira/software/projects/MIDI/boards/7?selectedIssue=MIDI-50)
+## MIDI Translation Transformers
 ### Overview
 The point of this project was to use transformer to predict high-resolution MIDI data from low-resolution,
 quantized MIDI notes.

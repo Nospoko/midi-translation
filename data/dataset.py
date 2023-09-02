@@ -22,12 +22,9 @@ class TokenizedMidiDataset:
         n_duration_bins: int = 3,
         n_velocity_bins: int = 3,
         sequence_len: int = 128,
-        device: str = "cpu",
-        samples_path: str = None,
     ):
         self.split = split
         self.sequence_len = sequence_len
-        self.device = device
 
         self.quantizer = MidiQuantizer(
             n_dstart_bins=n_dstart_bins,
@@ -38,71 +35,32 @@ class TokenizedMidiDataset:
         self.tokenizer_src = src_tokenizer
         self.tokenizer_tgt = tgt_tokenizer
 
-        if samples_path is None:
-            self.samples_path = (
-                f"tmp/datasets/samples-"
-                f"{self.quantizer.n_dstart_bins}-"
-                f"{self.quantizer.n_duration_bins}-"
-                f"{self.quantizer.n_velocity_bins}-"
-                f"{self.split}-"
-                f"{self.tokenizer_src.keys[0]}-{self.tokenizer_src.keys[1]}-vs-"
-                f"{self.tokenizer_tgt.keys[0]}-{self.tokenizer_tgt.keys[1]}.pt"
-            )
-        else:
-            self.samples_path = samples_path
-
         self.dataset = load_dataset(path="roszcz/maestro-v1", split=split)
 
         self.src_vocab, self.tgt_vocab = self.build_vocab()
 
-        self.processed_records, self.unprocessed_records = self.load_dataset()
+        self.processed_records, self.unprocessed_records = self._build_dataset()
         self.samples = self.load_samples()
 
     def load_samples(self) -> list[tuple[list[int], list[int]]]:
         samples = []
-        if os.path.isfile(self.samples_path):
-            samples = torch.load(self.samples_path)
-        else:
-            pbar = tqdm(zip(self.processed_records, self.unprocessed_records), total=len(self.processed_records))
 
-            print("Tokenizing ... ")
-            for processed_record, unprocessed_record in pbar:
-                src_tokens = self.tokenizer_src(processed_record)
-                tgt_tokens = self.tokenizer_tgt(processed_record)
+        pbar = tqdm(zip(self.processed_records, self.unprocessed_records), total=len(self.processed_records))
 
-                src_processed = [self.src_vocab.index(token) for token in src_tokens]
-                tgt_processed = [self.tgt_vocab.index(token) for token in tgt_tokens]
+        print("Tokenizing ... ")
+        for processed_record, unprocessed_record in pbar:
+            src_tokens = self.tokenizer_src(processed_record)
+            tgt_tokens = self.tokenizer_tgt(processed_record)
 
-                src = torch.tensor(src_processed, dtype=torch.int64, device=self.device)
-                tgt = torch.tensor(tgt_processed, dtype=torch.int64, device=self.device)
+            src_processed = [self.src_vocab.index(token) for token in src_tokens]
+            tgt_processed = [self.tgt_vocab.index(token) for token in tgt_tokens]
 
-                samples.append((src, tgt))
-            torch.save(samples, self.samples_path)
+            src = torch.tensor(src_processed, dtype=torch.int64)
+            tgt = torch.tensor(tgt_processed, dtype=torch.int64)
+
+            samples.append((src, tgt))
+
         return samples
-
-    def load_dataset(self) -> tuple[list[dict], list[dict]]:
-        path = (
-            "tmp/datasets/dataset-"
-            f"{self.quantizer.n_dstart_bins}-"
-            f"{self.quantizer.n_duration_bins}-"
-            f"{self.quantizer.n_velocity_bins}-"
-            f"{self.sequence_len}-"
-            f"{self.split}.pt"
-        )
-        if os.path.isfile(path):
-            records = torch.load(path)
-            processed_records = records["quantized"]
-            unprocessed_records = records["not_quantized"]
-        else:
-            processed_records, unprocessed_records = self._build_dataset()
-            torch.save(
-                {
-                    "quantized": processed_records,
-                    "not_quantized": unprocessed_records,
-                },
-                f=path,
-            )
-        return processed_records, unprocessed_records
 
     def _build_dataset(self) -> tuple[list[dict], list[dict]]:
         processed_records = []
@@ -164,19 +122,9 @@ class BinsToVelocityDataset(TokenizedMidiDataset):
         n_duration_bins: int = 3,
         n_velocity_bins: int = 3,
         sequence_len: int = 128,
-        device: str = "cpu",
     ):
         tokenizer_src = Tokenizer(keys=["pitch", "dstart_bin", "duration_bin", "velocity_bin"])
         tokenizer_tgt = VelocityTokenizer()
-
-        samples_path = (
-            f"tmp/datasets/samples-"
-            f"{n_dstart_bins}-"
-            f"{n_duration_bins}-"
-            f"{n_velocity_bins}-"
-            f"{split}-" 
-            f"bins-to-vel.pt"
-        )
 
         super().__init__(
             src_tokenizer=tokenizer_src,
@@ -186,8 +134,6 @@ class BinsToVelocityDataset(TokenizedMidiDataset):
             n_duration_bins=n_duration_bins,
             n_velocity_bins=n_velocity_bins,
             sequence_len=sequence_len,
-            device=device,
-            samples_path=samples_path,
         )
 
     def build_vocab(self) -> tuple[list[str], list[str]]:
@@ -213,24 +159,21 @@ class BinsToVelocityDataset(TokenizedMidiDataset):
 
     def load_samples(self) -> list[tuple[list[int], list[int]]]:
         samples = []
-        if os.path.isfile(self.samples_path):
-            samples = torch.load(self.samples_path)
-        else:
-            pbar = tqdm(zip(self.processed_records, self.unprocessed_records), total=len(self.processed_records))
 
-            print("Tokenizing ... ")
-            for processed_record, unprocessed_record in pbar:
-                src_tokens = self.tokenizer_src(processed_record)
-                tgt_tokens = self.tokenizer_tgt(unprocessed_record)
+        pbar = tqdm(zip(self.processed_records, self.unprocessed_records), total=len(self.processed_records))
 
-                src_processed = [self.src_vocab.index(token) for token in src_tokens]
-                tgt_processed = [self.tgt_vocab.index(token) for token in tgt_tokens]
+        print("Tokenizing ... ")
+        for processed_record, unprocessed_record in pbar:
+            src_tokens = self.tokenizer_src(processed_record)
+            tgt_tokens = self.tokenizer_tgt(unprocessed_record)
 
-                src = torch.tensor(src_processed, dtype=torch.int64, device=self.device)
-                tgt = torch.tensor(tgt_processed, dtype=torch.int64, device=self.device)
+            src_processed = [self.src_vocab.index(token) for token in src_tokens]
+            tgt_processed = [self.tgt_vocab.index(token) for token in tgt_tokens]
 
-                samples.append((src, tgt))
-            torch.save(samples, self.samples_path)
+            src = torch.tensor(src_processed, dtype=torch.int64)
+            tgt = torch.tensor(tgt_processed, dtype=torch.int64)
+
+            samples.append((src, tgt))
         return samples
 
 
