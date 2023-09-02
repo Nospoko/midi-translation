@@ -9,7 +9,7 @@ train:
 dataset:
   bins: "3 3 3"
   sequence_size: 128
-  
+
 device: "cpu"
 warmup: 3000
 log_frequency: 10

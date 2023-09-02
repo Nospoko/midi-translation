@@ -6,7 +6,7 @@ quantized MIDI notes.
 #### Training on gpu
 You can thain the model on gpu simply by running
 ```shell
-python train.py device=cuda:0 
+python train.py device=cuda:0
 ```
 #### Tokenization method
 You can train the model to learn to predict high-resolution velocity (128 values) from data quantized into from 2 to 10 bins.

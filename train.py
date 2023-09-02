@@ -1,13 +1,13 @@
-import hashlib
-import json
 import os
+import json
 import time
+import hashlib
 from typing import Callable, Iterable
 
 import hydra
-import pandas
 import torch
 import einops
+import pandas
 import torch.nn as nn
 from tqdm import tqdm
 from torch.utils.data import DataLoader
@@ -20,7 +20,7 @@ from data.batch import Batch
 from model import make_model
 from data.dataset import BinsToVelocityDataset
 from modules.label_smoothing import LabelSmoothing
-import pickle
+
 
 def load_datasets(cfg: DictConfig):
     n_dstart_bins, n_duration_bins, n_velocity_bins = cfg.bins.split(" ")
@@ -243,7 +243,7 @@ def val_epoch(
     model: nn.Module,
     criterion: Callable,
     pad_idx: int = 2,
-    device: str = "cpu"
+    device: str = "cpu",
 ) -> float:
     total_tokens = 0
     total_loss = 0
