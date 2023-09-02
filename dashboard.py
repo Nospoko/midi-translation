@@ -9,7 +9,7 @@ from omegaconf import OmegaConf
 from datasets import load_dataset
 
 from model import make_model
-from eval import make_examples
+from eval import make_examples, load_test_dataset
 from utils import piece_av_files
 from data.dataset import BinsToVelocityDataset
 
@@ -48,18 +48,7 @@ def model_predictions_review():
 
     train_cfg = OmegaConf.create(checkpoint["cfg"])
 
-    # read tokenization method from train_cfg
-    n_dstart_bins, n_duration_bins, n_velocity_bins = train_cfg.bins.split(" ")
-    n_dstart_bins, n_duration_bins, n_velocity_bins = int(n_dstart_bins), int(n_duration_bins), int(n_velocity_bins)
-    hf_dataset = load_dataset("roszcz/maestro-v1", split="test")
-
-    dataset = BinsToVelocityDataset(
-        hf_dataset,
-        n_dstart_bins=n_dstart_bins,
-        n_duration_bins=n_duration_bins,
-        n_velocity_bins=n_velocity_bins,
-        sequence_len=train_cfg.sequence_size,
-    )
+    dataset = load_dataset(train_cfg.dataset)
 
     model = make_model(
         input_size=len(dataset.src_vocab),
@@ -153,13 +142,14 @@ def tokenization_review_dashboard():
     n_dstart_bins, n_duration_bins, n_velocity_bins = bins
     n_dstart_bins, n_duration_bins, n_velocity_bins = int(n_dstart_bins), int(n_duration_bins), int(n_velocity_bins)
     bins = "-".join(bins)
-
-    dataset = BinsToVelocityDataset(
-        split="validation",
-        n_dstart_bins=n_dstart_bins,
-        n_duration_bins=n_duration_bins,
-        n_velocity_bins=n_velocity_bins,
+    dataset_cfg = OmegaConf.create(
+        {
+            "bins": bins,
+            "sequence_len": 128
+        }
     )
+
+    dataset = load_test_dataset(dataset_cfg)
     n_samples = 5
     cols = st.columns(2)
     with cols[0]:

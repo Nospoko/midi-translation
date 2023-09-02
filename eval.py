@@ -1,18 +1,48 @@
+import hashlib
+import json
 import os
 
 import hydra
 import torch
 import torch.nn as nn
-from omegaconf import OmegaConf
+from omegaconf import OmegaConf, DictConfig
 from datasets import load_dataset
 from torch.utils.data import DataLoader
-
+import pandas
 from train import val_epoch
 from data.batch import Batch
 from model import make_model
 from data.dataset import BinsToVelocityDataset
 from modules.encoderdecoder import subsequent_mask
 from modules.label_smoothing import LabelSmoothing
+
+
+def load_test_dataset(cfg: DictConfig):
+    n_dstart_bins, n_duration_bins, n_velocity_bins = cfg.bins.split(" ")
+    n_dstart_bins, n_duration_bins, n_velocity_bins = int(n_dstart_bins), int(n_duration_bins), int(n_velocity_bins)
+
+    config_hash = hashlib.sha256()
+    config_string = json.dumps(OmegaConf.to_container(cfg))
+    config_hash.update(config_string.encode())
+    config_hash = config_hash.hexdigest()
+    cache_dir = "tmp/datasets"
+    dataset_cache_file = f"{config_hash}_test.pkl"
+
+    dataset_cache_file = f"{config_hash}_val.pkl"
+    dataset_cache_path = os.path.join(cache_dir, dataset_cache_file)
+    if os.path.exists(dataset_cache_path):
+        dataset = pandas.read_pickle(dataset_cache_path)
+    else:
+        dataset = load_dataset("roszcz/maestro-v1", split="test")
+        train_dataset = BinsToVelocityDataset(
+            dataset=dataset,
+            n_dstart_bins=n_dstart_bins,
+            n_velocity_bins=n_velocity_bins,
+            n_duration_bins=n_duration_bins,
+            sequence_len=cfg.sequence_size,
+        )
+        pandas.to_pickle(train_dataset, dataset_cache_path)
+    return dataset
 
 
 @hydra.main(version_base=None, config_path="config", config_name="eval_conf")
@@ -23,14 +53,7 @@ def main(cfg):
         device=cfg.device,
     )
     train_cfg = OmegaConf.create(checkpoint["cfg"])
-    dataset = load_dataset("roszcz/maestro-v1", split="test")
-    val_data = BinsToVelocityDataset(
-        dataset=dataset,
-        n_dstart_bins=3,
-        n_velocity_bins=3,
-        n_duration_bins=3,
-        sequence_len=train_cfg.sequence_size,
-    )
+    val_data = load_test_dataset(train_cfg.dataset)
 
     dataloader = DataLoader(val_data, batch_size=train_cfg.train.batch_size)
 
