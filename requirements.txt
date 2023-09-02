@@ -1,4 +1,5 @@
 datasets~=2.14.4
+einops~=0.6.1
 fortepyan~=0.2.4
 hydra-core~=1.3.2
 matplotlib~=3.7.2

@@ -160,7 +160,7 @@ def train_model(
                 model=model,
                 criterion=criterion,
                 pad_idx=pad_idx,
-                device=cfg.device
+                device=cfg.device,
             )
             print(float(v_loss))
 
@@ -189,11 +189,11 @@ def train_epoch(
     # create progress bar
     steps = len(dataloader)
     pbar = tqdm(dataloader, total=steps)
-
+    dev = torch.device(device)
     for b in pbar:
         batch = Batch(b[0], b[1], pad=pad_idx)
 
-        batch.to(device)
+        batch.to(dev)
 
         encoded_decoded = model.forward(batch.src, batch.tgt, batch.src_mask, batch.tgt_mask)
         out = model.generator(encoded_decoded)
@@ -247,9 +247,11 @@ def val_epoch(
     total_loss = 0
     tokens = 0
 
+    dev = torch.device(device)
+
     for b in tqdm(dataloader):
         batch = Batch(b[0], b[1], pad=pad_idx)
-        batch.to(device)
+        batch.to(dev)
 
         encoded_decoded = model.forward(batch.src, batch.tgt, batch.src_mask, batch.tgt_mask)
         out = model.generator(encoded_decoded)

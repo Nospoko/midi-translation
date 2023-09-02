@@ -9,9 +9,9 @@ from omegaconf import OmegaConf
 from datasets import load_dataset
 
 from model import make_model
-from eval import make_examples, load_test_dataset
 from utils import piece_av_files
 from data.dataset import BinsToVelocityDataset
+from eval import make_examples, load_test_dataset
 
 
 def main():
@@ -142,12 +142,7 @@ def tokenization_review_dashboard():
     n_dstart_bins, n_duration_bins, n_velocity_bins = bins
     n_dstart_bins, n_duration_bins, n_velocity_bins = int(n_dstart_bins), int(n_duration_bins), int(n_velocity_bins)
     bins = "-".join(bins)
-    dataset_cfg = OmegaConf.create(
-        {
-            "bins": bins,
-            "sequence_len": 128
-        }
-    )
+    dataset_cfg = OmegaConf.create({"bins": bins, "sequence_len": 128})
 
     dataset = load_test_dataset(dataset_cfg)
     n_samples = 5

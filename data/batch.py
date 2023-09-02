@@ -31,11 +31,13 @@ class Batch:
         tgt_mask = tgt_mask & subsequent_mask(tgt.size(-1)).type_as(tgt_mask.data)
         return tgt_mask
 
-    def to(self, device: str):
-        self.src.to(device)
-        self.tgt.to(device)
-        self.src_mask.to(device)
-        self.tgt_mask.to(device)
+    def to(self, device: torch.device):
+        self.src = self.src.to(device)
+        self.tgt = self.tgt.to(device)
+        self.src_mask = self.src_mask.to(device)
+        self.tgt_mask = self.tgt_mask.to(device)
+        self.tgt_y = self.tgt_y.to(device)
+        self.ntokens = self.ntokens.to(device)
 
     def __len__(self) -> int:
         return self.src.shape[0]

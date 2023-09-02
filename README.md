@@ -28,7 +28,7 @@ train:
   distributed: False
   label_smoothing: 0.1
 
-dataset: 
+dataset:
   bins: "3 3 3"
   sequence_size: 128
 device: "cpu"
