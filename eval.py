@@ -108,14 +108,17 @@ def make_examples(
     results = []
     pad_idx = dataset.tgt_vocab.index("<blank>")
     dataloader = DataLoader(dataset, shuffle=random)
-    idx = 0
+    idx = -1
     for b in dataloader:
         batch = Batch(b[0], b[1], pad_idx)
         for it in range(len(batch)):
-            # I want to be able to get samples from any index from the database
-            if idx < start_index:
-                idx += 1
+            idx += 1
+            # I want to be able to get samples from any index from the database,
+            # I also want to use examples without overlap
+            if idx < start_index or idx % 2 == 1:
                 continue
+
+
             record = batch[it]
             src_tokens = [dataset.src_vocab[x] for x in record.src if x != pad_idx]
             tgt_tokens = [dataset.tgt_vocab[x] for x in record.tgt if x != pad_idx]

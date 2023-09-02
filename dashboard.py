@@ -34,14 +34,17 @@ def model_predictions_review():
 
     # load checkpoint
     checkpoint = torch.load(path, map_location="cpu")
-    cols = st.columns(3)
+    cols = st.columns(4)
 
     with cols[0]:
         st.markdown("### Unchanged")
     with cols[1]:
         st.markdown("### Quantized")
     with cols[2]:
+        st.markdown("### Target")
+    with cols[3]:
         st.markdown("### Predicted")
+
     train_cfg = OmegaConf.create(checkpoint["cfg"])
 
     # read tokenization method from train_cfg
@@ -70,9 +73,14 @@ def model_predictions_review():
     results = make_examples(dataset=dataset, model=model, start_index=start_index, n_examples=n_samples)
 
     bins = train_cfg.bins.replace(" ", "-")
-    for idx in range(n_samples):
-        src = results[idx]["src"]
-        out = results[idx]["out"]
+    for it in range(n_samples):
+
+        # I use every second record, so as not to create overlapped examples - it works together with make_examples()
+        idx = it * 2
+
+        src = results[it]["src"]
+        tgt = results[it]["tgt"]
+        out = results[it]["out"]
 
         # get unprocessed data
         record = dataset.unprocessed_records[idx + start_index]
@@ -80,6 +88,7 @@ def model_predictions_review():
         # get untokenized source data
         source = dataset.tokenizer_src.untokenize(src)
         predicted = dataset.tokenizer_tgt.untokenize(out)
+        velocities = dataset.tokenizer_tgt.untokenize(tgt)
         print("start")
 
         filename = record["midi_filename"]
@@ -87,23 +96,34 @@ def model_predictions_review():
         # prepare unprocessed and tokenized midi pieces
         true_piece, src_piece = prepare_midi_pieces(record, source, idx=idx + start_index, dataset=dataset, bins=bins)
         pred_piece_df = src_piece.df.copy()
+        tgt_piece_df = src_piece.df.copy()
+
 
         # change untokenized velocities to model predictions
         # TODO: predictions are sometimes the length of 127 or 126 instead of 128 ???
+        tgt_piece_df["velocity"] = velocities
         pred_piece_df["velocity"] = predicted
         pred_piece_df["velocity"] = pred_piece_df["velocity"].fillna(0)
 
         # create quantized piece with predicted velocities
         pred_piece = MidiPiece(pred_piece_df)
+        tgt_piece = MidiPiece(tgt_piece_df)
+
         pred_piece.source = true_piece.source.copy()
+        tgt_piece.source = true_piece.source.copy()
 
         name = filename.split("/")[0] + "/" + str(idx + start_index) + "-predicted-" + bins
         pred_piece.source["midi_filename"] = name + os.path.basename(filename)
 
+        name = filename.split("/")[0] + "/" + str(idx + start_index) + "-target-" + bins
+        tgt_piece.source["midi_filename"] = name + os.path.basename(filename)
+
+        print("Creating files ...")
         # create files
         paths = piece_av_files(true_piece)
         src_piece_paths = piece_av_files(src_piece)
         predicted_paths = piece_av_files(pred_piece)
+        tgt_paths = piece_av_files(tgt_piece)
 
         # create a dashboard
         with cols[0]:
@@ -117,9 +137,16 @@ def model_predictions_review():
             st.table(src_piece.source)
 
         with cols[2]:
+            st.image(tgt_paths["pianoroll_path"])
+            st.audio(tgt_paths["mp3_path"])
+            st.table(tgt_piece.source)
+
+        with cols[3]:
             st.image(predicted_paths["pianoroll_path"])
             st.audio(predicted_paths["mp3_path"])
             st.table(pred_piece.source)
+
+
 
 
 def tokenization_review_dashboard():
