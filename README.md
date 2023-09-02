@@ -53,9 +53,14 @@ You can try out different tokenization methods i.e. different nuber of bins by r
 streamlit run --server.port 4466 dashboard.py
 ```
 And choosing Tokenization review option from "Display" selectbox.
+![image](https://github.com/Nospoko/midi-translation/assets/74838859/12c70bdb-fbfb-4fc7-8dcc-411c0c161055)
+
 #### Model predictions review
 When you have trained your model, you can listen to and compare model predictions with original and target pieces.
 Run the same command and choose "Model predictions" option.
+
+![image](https://github.com/Nospoko/midi-translation/assets/74838859/efe5746f-4d15-49e2-9bc3-d4dfdf5f558c)
+
 ### Eval
 You can evaluate your model and see the loss on the test dataset. For example if you have a model weights file called
 ```
