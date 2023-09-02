@@ -14,7 +14,7 @@ import wandb
 from utils import rate
 from data.batch import Batch
 from model import make_model
-from data.dataset import TokenizedMidiDataset
+from data.dataset import BinsToVelocityDataset
 from modules.label_smoothing import LabelSmoothing
 
 
@@ -23,7 +23,7 @@ def main(cfg: DictConfig):
     n_dstart_bins, n_duration_bins, n_velocity_bins = cfg.bins.split(" ")
     n_dstart_bins, n_duration_bins, n_velocity_bins = int(n_dstart_bins), int(n_duration_bins), int(n_velocity_bins)
     bins = "-".join(cfg.bins.split(" "))
-    train_data = TokenizedMidiDataset(
+    train_data = BinsToVelocityDataset(
         split="train",
         n_dstart_bins=n_dstart_bins,
         n_velocity_bins=n_velocity_bins,
@@ -31,7 +31,7 @@ def main(cfg: DictConfig):
         sequence_len=cfg.sequence_size,
         device=cfg.device,
     )
-    val_data = TokenizedMidiDataset(
+    val_data = BinsToVelocityDataset(
         split="validation",
         n_dstart_bins=n_dstart_bins,
         n_velocity_bins=n_velocity_bins,
@@ -62,8 +62,8 @@ def initialize_wandb(cfg: DictConfig):
 
 
 def train_model(
-    train_data: TokenizedMidiDataset,
-    val_data: TokenizedMidiDataset,
+    train_data: BinsToVelocityDataset,
+    val_data: BinsToVelocityDataset,
     cfg: DictConfig,
 ) -> nn.Module:
     # Get the index for padding token

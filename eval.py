@@ -9,7 +9,7 @@ from torch.utils.data import DataLoader
 from train import val_epoch
 from data.batch import Batch
 from model import make_model
-from data.dataset import TokenizedMidiDataset
+from data.dataset import BinsToVelocityDataset
 from modules.encoderdecoder import subsequent_mask
 from modules.label_smoothing import LabelSmoothing
 
@@ -22,7 +22,7 @@ def main(cfg):
         device=cfg.device,
     )
     train_cfg = OmegaConf.create(checkpoint["cfg"])
-    val_data = TokenizedMidiDataset(
+    val_data = BinsToVelocityDataset(
         split="test",
         n_dstart_bins=3,
         n_velocity_bins=3,
@@ -98,7 +98,7 @@ def load_checkpoint(run_name: str, epoch: str = "final", device: str = "cpu"):
 
 
 def make_examples(
-    dataset: TokenizedMidiDataset,
+    dataset: BinsToVelocityDataset,
     model: nn.Module,
     start_index: int = 0,
     n_examples: int = 5,
@@ -117,7 +117,6 @@ def make_examples(
             # I also want to use examples without overlap
             if idx < start_index or idx % 2 == 1:
                 continue
-
 
             record = batch[it]
             src_tokens = [dataset.src_vocab[x] for x in record.src if x != pad_idx]

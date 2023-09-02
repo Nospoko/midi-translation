@@ -10,7 +10,7 @@ from omegaconf import OmegaConf
 from model import make_model
 from eval import make_examples
 from utils import piece_av_files
-from data.dataset import TokenizedMidiDataset
+from data.dataset import BinsToVelocityDataset
 
 
 def main():
@@ -21,7 +21,7 @@ def main():
         model_predictions_review()
 
 
-def get_sample_info(dataset: TokenizedMidiDataset, midi_filename: str):
+def get_sample_info(dataset: BinsToVelocityDataset, midi_filename: str):
     sample_data = dataset.dataset.filter(lambda row: row["midi_filename"] == midi_filename)
     title, composer = sample_data["title"][0], sample_data["composer"][0]
     return title, composer
@@ -51,7 +51,7 @@ def model_predictions_review():
     n_dstart_bins, n_duration_bins, n_velocity_bins = train_cfg.bins.split(" ")
     n_dstart_bins, n_duration_bins, n_velocity_bins = int(n_dstart_bins), int(n_duration_bins), int(n_velocity_bins)
 
-    dataset = TokenizedMidiDataset(
+    dataset = BinsToVelocityDataset(
         split="test",
         n_dstart_bins=n_dstart_bins,
         n_duration_bins=n_duration_bins,
@@ -74,7 +74,6 @@ def model_predictions_review():
 
     bins = train_cfg.bins.replace(" ", "-")
     for it in range(n_samples):
-
         # I use every second record, so as not to create overlapped examples - it works together with make_examples()
         idx = it * 2
 
@@ -97,7 +96,6 @@ def model_predictions_review():
         true_piece, src_piece = prepare_midi_pieces(record, source, idx=idx + start_index, dataset=dataset, bins=bins)
         pred_piece_df = src_piece.df.copy()
         tgt_piece_df = src_piece.df.copy()
-
 
         # change untokenized velocities to model predictions
         # TODO: predictions are sometimes the length of 127 or 126 instead of 128 ???
@@ -147,8 +145,6 @@ def model_predictions_review():
             st.table(pred_piece.source)
 
 
-
-
 def tokenization_review_dashboard():
     st.markdown("### Tokenization method:\n" "**n_dstart_bins    n_duration_bins    n_velocity_bins**")
     bins = st.text_input(label="bins", value="3 3 3").split(" ")
@@ -156,7 +152,7 @@ def tokenization_review_dashboard():
     n_dstart_bins, n_duration_bins, n_velocity_bins = int(n_dstart_bins), int(n_duration_bins), int(n_velocity_bins)
     bins = "-".join(bins)
 
-    dataset = TokenizedMidiDataset(
+    dataset = BinsToVelocityDataset(
         split="validation",
         n_dstart_bins=n_dstart_bins,
         n_duration_bins=n_duration_bins,
@@ -194,7 +190,7 @@ def tokenization_review_dashboard():
 
 
 def prepare_midi_pieces(
-    unprocessed: dict, processed: dict, idx: int, dataset: TokenizedMidiDataset, bins: str = "3-3-3"
+    unprocessed: dict, processed: dict, idx: int, dataset: BinsToVelocityDataset, bins: str = "3-3-3"
 ) -> tuple[MidiPiece, MidiPiece]:
     # get dataframes with notes
     processed_df = pd.DataFrame(processed)
