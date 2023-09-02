@@ -148,26 +148,20 @@ def train_model(
             accum_iter=cfg.train.accum_iter,
             log_frequency=cfg.log_frequency,
             pad_idx=pad_idx,
-        )
-
-        bins = "-".join(cfg.bins.split(" "))
-        # Save checkpoint after each epoch
-        file_path = f"models/{bins}-{cfg.file_prefix}-{cfg.run_name}-{epoch}.pt"
-        torch.save(
-            {
-                "model_state_dict": model.state_dict(),
-                "cfg": OmegaConf.to_container(cfg),
-                "input_size": len(train_data.src_vocab),
-                "output_size": len(train_data.tgt_vocab),
-            },
-            file_path,
+            device=cfg.device,
         )
 
         print(f"Epoch {epoch} Validation", flush=True)
         with torch.no_grad():
             model.eval()
             # Evaluate the model on validation set
-            v_loss = val_epoch(dataloader=val_dataloader, model=model, criterion=criterion, pad_idx=pad_idx)
+            v_loss = val_epoch(
+                dataloader=val_dataloader,
+                model=model,
+                criterion=criterion,
+                pad_idx=pad_idx,
+                device=cfg.device
+            )
             print(float(v_loss))
 
         # Log validation and training losses
