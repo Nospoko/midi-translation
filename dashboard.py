@@ -62,7 +62,7 @@ def model_predictions_review():
     # predict velocities and get src, tgt and model output
     results = make_examples(dataset=dataset, model=model, start_index=start_index, n_examples=n_samples)
 
-    bins = train_cfg.bins.replace(" ", "-")
+    bins = train_cfg.dataset.bins.replace(" ", "-")
     for it in range(n_samples):
         # I use every second record, so as not to create overlapped examples - it works together with make_examples()
         idx = it * 2
