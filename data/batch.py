@@ -15,7 +15,7 @@ class Record:
 class Batch:
     """Object for holding a batch of data with mask during training."""
 
-    def __init__(self, src: torch.Tensor, tgt=None, pad=2):  # 2 = <blank>
+    def __init__(self, src: torch.Tensor, tgt=None, pad=1):  # 1 = <blank>
         self.src = src
         self.src_mask = (src != pad).unsqueeze(-2)
 

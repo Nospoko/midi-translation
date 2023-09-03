@@ -1,5 +1,6 @@
 import os
 
+import torch
 import fortepyan as ff
 import matplotlib.pyplot as plt
 from fortepyan import MidiPiece
@@ -27,6 +28,12 @@ def piece_av_files(piece: MidiPiece) -> dict:
         "pianoroll_path": pianoroll_path,
     }
     return paths
+
+
+def distance(out: torch.Tensor, tgt: torch.Tensor):
+    labels = out.argmax(1).to(float)
+    # euclidean distance
+    return torch.dist(labels, tgt.to(float), p=2)
 
 
 def rate(step: int, model_size: int, factor: float, warmup: int) -> float:

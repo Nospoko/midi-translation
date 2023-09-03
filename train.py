@@ -16,9 +16,9 @@ from omegaconf import OmegaConf, DictConfig
 from torch.optim.lr_scheduler import LambdaLR
 
 import wandb
-from utils import rate
 from data.batch import Batch
 from model import make_model
+from utils import rate, distance
 from data.dataset import BinsToVelocityDataset
 from modules.label_smoothing import LabelSmoothing
 
@@ -139,7 +139,7 @@ def train_model(
         print(f"Epoch {epoch}", flush=True)
 
         # Train model for one epoch
-        t_loss = train_epoch(
+        t_loss, t_dist = train_epoch(
             dataloader=train_dataloader,
             model=model,
             criterion=criterion,
@@ -155,7 +155,7 @@ def train_model(
         with torch.no_grad():
             model.eval()
             # Evaluate the model on validation set
-            v_loss = val_epoch(
+            v_loss, v_dist = val_epoch(
                 dataloader=val_dataloader,
                 model=model,
                 criterion=criterion,
@@ -165,7 +165,14 @@ def train_model(
             print(float(v_loss))
 
         # Log validation and training losses
-        wandb.log({"val/loss_epoch": v_loss, "train/loss_epoch": t_loss})
+        wandb.log(
+            {
+                "val/loss_epoch": v_loss,
+                "val/dist_epoch": v_dist,
+                "train/loss_epoch": t_loss,
+                "train/dist_epoch": t_dist,
+            }
+        )
     return model
 
 
@@ -179,9 +186,10 @@ def train_epoch(
     log_frequency: int = 10,
     pad_idx: int = 2,
     device="cpu",
-) -> float:
+) -> tuple[float, float]:
     start = time.time()
     total_loss = 0
+    total_dist = 0
     tokens = 0
     n_accum = 0
     it = 0
@@ -200,8 +208,11 @@ def train_epoch(
 
         out = einops.rearrange(out, "b n d -> (b n) d")
         target = einops.rearrange(batch.tgt_y, "b n -> (b n)")
+
         loss = criterion(out, target) / batch.ntokens
         loss.backward()
+
+        dist = distance(out, target)
 
         # Update the model parameters and optimizer gradients every `accum_iter` iterations
         if it % accum_iter == 0 or it == steps - 1:
@@ -216,6 +227,7 @@ def train_epoch(
         # Update loss and token counts
         loss_item = loss.item()
         total_loss += loss.item()
+        total_dist += dist
         tokens += batch.ntokens
 
         # log metrics every log_frequency steps
@@ -224,15 +236,15 @@ def train_epoch(
             elapsed = time.time() - start
             tok_rate = tokens / elapsed
             pbar.set_description(
-                f"Step: {it:6d}/{steps} | acc_step: {n_accum:3d} | Loss: {loss_item:6.2f}"
-                + f"| tps: {tok_rate:7.1f} | LR: {lr:6.1e}"
+                f"Step: {it:6d}/{steps} | acc_step: {n_accum:3d} | loss: {loss_item:6.2f} | dist: {dist:6.2f}"
+                + f"| tps: {tok_rate:7.1f} | lr: {lr:6.1e}"
             )
 
             # log the loss each to Weights and Biases
-            wandb.log({"train/loss_step": loss.item()})
+            wandb.log({"train/loss_step": loss.item(), "train/dist_step": dist})
 
     # Return average loss over all tokens and updated train state
-    return total_loss / len(dataloader)
+    return total_loss / len(dataloader), total_dist / len(dataloader)
 
 
 @torch.no_grad()
@@ -242,10 +254,11 @@ def val_epoch(
     criterion: Callable,
     pad_idx: int = 2,
     device: str = "cpu",
-) -> float:
+) -> tuple[float, float]:
     total_tokens = 0
     total_loss = 0
     tokens = 0
+    total_dist = 0
 
     dev = torch.device(device)
 
@@ -257,15 +270,16 @@ def val_epoch(
         out = model.generator(encoded_decoded)
 
         out_rearranged = einops.rearrange(out, "b n d -> (b n) d")
-        tgt_rearranged = einops.rearrange(batch.tgt_y, "b n -> (b n)")
-        loss = criterion(out_rearranged, tgt_rearranged) / batch.ntokens
+        target = einops.rearrange(batch.tgt_y, "b n -> (b n)")
+        loss = criterion(out_rearranged, target) / batch.ntokens
 
         total_loss += loss.item()
         total_tokens += batch.ntokens
         tokens += batch.ntokens
+        total_dist += distance(out_rearranged, target)
 
     # Return average loss over all tokens and updated train state
-    return total_loss / len(dataloader)
+    return total_loss / len(dataloader), total_dist / len(dataloader)
 
 
 if __name__ == "__main__":
