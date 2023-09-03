@@ -100,7 +100,7 @@ def model_predictions_review():
         pred_piece.source = true_piece.source.copy()
         tgt_piece.source = true_piece.source.copy()
 
-        name = filename.split("/")[0] + "/" + str(idx + start_index) + "-predicted-" + bins
+        name = filename.split("/")[0] + "/" + str(idx + start_index) + f"-{train_cfg.run_name}-" + bins
         pred_piece.source["midi_filename"] = name + os.path.basename(filename)
 
         name = filename.split("/")[0] + "/" + str(idx + start_index) + "-target-" + bins
