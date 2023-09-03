@@ -31,7 +31,8 @@ def model_predictions_review():
     # options
     path = "models/" + st.selectbox(label="model", options=os.listdir("models"))
     start_index = eval(st.text_input(label="start index", value="0"))
-
+    run_name = '-'.join(path.split('-')[-6:-1])[:-3]
+    print(run_name)
     # load checkpoint
     checkpoint = torch.load(path, map_location="cpu")
     cols = st.columns(4)
@@ -78,7 +79,6 @@ def model_predictions_review():
         source = dataset.tokenizer_src.untokenize(src)
         predicted = dataset.tokenizer_tgt.untokenize(out)
         velocities = dataset.tokenizer_tgt.untokenize(tgt)
-        print("start")
 
         filename = record["midi_filename"]
 
@@ -100,7 +100,7 @@ def model_predictions_review():
         pred_piece.source = true_piece.source.copy()
         tgt_piece.source = true_piece.source.copy()
 
-        name = filename.split("/")[0] + "/" + str(idx + start_index) + f"-{train_cfg.run_name}-" + bins
+        name = filename.split("/")[0] + "/" + str(idx + start_index) + f"-{run_name}-" + bins
         pred_piece.source["midi_filename"] = name + os.path.basename(filename)
 
         name = filename.split("/")[0] + "/" + str(idx + start_index) + "-target-" + bins
