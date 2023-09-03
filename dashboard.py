@@ -6,7 +6,6 @@ import pandas as pd
 import streamlit as st
 from fortepyan import MidiPiece
 from omegaconf import OmegaConf
-from datasets import load_dataset
 
 from model import make_model
 from utils import piece_av_files
@@ -48,7 +47,7 @@ def model_predictions_review():
 
     train_cfg = OmegaConf.create(checkpoint["cfg"])
 
-    dataset = load_dataset(train_cfg.dataset)
+    dataset = load_test_dataset(train_cfg.dataset)
 
     model = make_model(
         input_size=len(dataset.src_vocab),
