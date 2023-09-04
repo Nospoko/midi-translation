@@ -28,7 +28,7 @@ def process_dataset(dataset_path: str, split: str, sequence_len: int, quantizer:
 
 
 def unprocessed_samples(piece: ff.MidiPiece, sequence_len: int) -> list[dict]:
-    record = []
+    records = []
     midi_filename = piece.source["midi_filename"]
     step = sequence_len // 2
     df = piece.df.copy()
@@ -44,8 +44,8 @@ def unprocessed_samples(piece: ff.MidiPiece, sequence_len: int) -> list[dict]:
             "duration": subset.duration.values,
             "velocity": subset.velocity.values,
         }
-        record.append(sequence)
-    return record
+        records.append(sequence)
+    return records
 
 
 def process_record(piece: ff.MidiPiece, sequence_len: int, quantizer: MidiQuantizer) -> list[dict]:

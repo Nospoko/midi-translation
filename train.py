@@ -1,13 +1,13 @@
 import os
 import json
 import time
+import pickle
 import hashlib
 from typing import Callable, Iterable
 
 import hydra
 import torch
 import einops
-import pandas
 import torch.nn as nn
 from tqdm import tqdm
 from datasets import load_dataset
@@ -23,49 +23,6 @@ from data.dataset import BinsToVelocityDataset
 from modules.label_smoothing import LabelSmoothing
 
 
-def load_datasets(cfg: DictConfig):
-    n_dstart_bins, n_duration_bins, n_velocity_bins = cfg.bins.split(" ")
-    n_dstart_bins, n_duration_bins, n_velocity_bins = int(n_dstart_bins), int(n_duration_bins), int(n_velocity_bins)
-
-    config_hash = hashlib.sha256()
-    config_string = json.dumps(OmegaConf.to_container(cfg))
-    config_hash.update(config_string.encode())
-    config_hash = config_hash.hexdigest()
-    cache_dir = "tmp/datasets"
-    train_dataset_cache_file = f"{config_hash}_train.pkl"
-
-    val_dataset_cache_file = f"{config_hash}_val.pkl"
-    train_dataset_cache_path = os.path.join(cache_dir, train_dataset_cache_file)
-    val_dataset_cache_path = os.path.join(cache_dir, val_dataset_cache_file)
-    if os.path.exists(train_dataset_cache_path):
-        train_dataset = pandas.read_pickle(train_dataset_cache_path)
-    else:
-        dataset = load_dataset("roszcz/maestro-v1", split="train")
-        train_dataset = BinsToVelocityDataset(
-            dataset=dataset,
-            n_dstart_bins=n_dstart_bins,
-            n_velocity_bins=n_velocity_bins,
-            n_duration_bins=n_duration_bins,
-            sequence_len=cfg.sequence_size,
-        )
-        pandas.to_pickle(train_dataset, train_dataset_cache_path)
-
-    if os.path.exists(val_dataset_cache_path):
-        val_dataset = pandas.read_pickle(val_dataset_cache_path)
-    else:
-        dataset = load_dataset("roszcz/maestro-v1", split="validation")
-
-        val_dataset = BinsToVelocityDataset(
-            dataset=dataset,
-            n_dstart_bins=n_dstart_bins,
-            n_velocity_bins=n_velocity_bins,
-            n_duration_bins=n_duration_bins,
-            sequence_len=cfg.sequence_size,
-        )
-        pandas.to_pickle(val_dataset, val_dataset_cache_path)
-    return train_dataset, val_dataset
-
-
 @hydra.main(version_base=None, config_path="config", config_name="conf")
 def main(cfg: DictConfig):
     bins = "-".join(cfg.dataset.bins.split(" "))
@@ -77,12 +34,69 @@ def main(cfg: DictConfig):
     torch.save(
         {
             "model_state_dict": model.state_dict(),
-            "cfg": OmegaConf.to_container(cfg),
+            "cfg": OmegaConf.to_object(cfg),
             "input_size": len(train_data.src_vocab),
             "output_size": len(train_data.tgt_vocab),
         },
         path,
     )
+
+
+def load_datasets(cfg: DictConfig):
+    n_dstart_bins, n_duration_bins, n_velocity_bins = cfg.bins.split(" ")
+    n_dstart_bins, n_duration_bins, n_velocity_bins = int(n_dstart_bins), int(n_duration_bins), int(n_velocity_bins)
+
+    # create filename for the dataset
+    config_hash = hashlib.sha256()
+    config_string = json.dumps(OmegaConf.to_container(cfg))
+    config_hash.update(config_string.encode())
+    config_hash = config_hash.hexdigest()
+    cache_dir = "tmp/datasets"
+
+    train_dataset_cache_file = f"{config_hash}_train.pkl"
+    val_dataset_cache_file = f"{config_hash}_val.pkl"
+
+    train_dataset_cache_path = os.path.join(cache_dir, train_dataset_cache_file)
+    val_dataset_cache_path = os.path.join(cache_dir, val_dataset_cache_file)
+
+    # load the data if the file exists or create and cache new dataset
+    if os.path.exists(train_dataset_cache_path):
+        # using pickle because pandas.to_pickle used an older version with a bug
+        train_file = open(train_dataset_cache_path, "rb")
+        train_dataset = pickle.load(train_file)
+    else:
+        train_file = open(train_dataset_cache_path, "wb")
+        dataset = load_dataset("roszcz/maestro-v1", split="train")
+        train_dataset = BinsToVelocityDataset(
+            dataset=dataset,
+            n_dstart_bins=n_dstart_bins,
+            n_velocity_bins=n_velocity_bins,
+            n_duration_bins=n_duration_bins,
+            sequence_len=cfg.sequence_size,
+        )
+        pickle.dump(train_dataset, train_file)
+
+    if os.path.exists(val_dataset_cache_path):
+        val_file = open(val_dataset_cache_path, "rb")
+        val_dataset = pickle.load(val_file)
+    else:
+        val_file = open(val_dataset_cache_path, "wb")
+
+        dataset = load_dataset("roszcz/maestro-v1", split="validation")
+
+        val_dataset = BinsToVelocityDataset(
+            dataset=dataset,
+            n_dstart_bins=n_dstart_bins,
+            n_velocity_bins=n_velocity_bins,
+            n_duration_bins=n_duration_bins,
+            sequence_len=cfg.sequence_size,
+        )
+        pickle.dump(val_dataset, val_file)
+
+    train_file.close()
+    val_file.close()
+
+    return train_dataset, val_dataset
 
 
 def initialize_wandb(cfg: DictConfig):

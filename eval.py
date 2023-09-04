@@ -1,10 +1,10 @@
 import os
 import json
+import pickle
 import hashlib
 
 import hydra
 import torch
-import pandas
 import torch.nn as nn
 from datasets import load_dataset
 from torch.utils.data import DataLoader
@@ -32,17 +32,19 @@ def load_test_dataset(cfg: DictConfig):
     dataset_cache_file = f"{config_hash}_val.pkl"
     dataset_cache_path = os.path.join(cache_dir, dataset_cache_file)
     if os.path.exists(dataset_cache_path):
-        dataset = pandas.read_pickle(dataset_cache_path)
+        file = open(dataset_cache_path, "rb")
+        dataset = pickle.load(file)
     else:
+        file = open(dataset_cache_path, "wb")
         dataset = load_dataset("roszcz/maestro-v1", split="test")
-        train_dataset = BinsToVelocityDataset(
+        test_dataset = BinsToVelocityDataset(
             dataset=dataset,
             n_dstart_bins=n_dstart_bins,
             n_velocity_bins=n_velocity_bins,
             n_duration_bins=n_duration_bins,
             sequence_len=cfg.sequence_size,
         )
-        pandas.to_pickle(train_dataset, dataset_cache_path)
+        pickle.dump(test_dataset, file)
     return dataset
 
 

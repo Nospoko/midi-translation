@@ -1,4 +1,5 @@
 import os
+import glob
 
 import torch
 import numpy as np
@@ -29,12 +30,13 @@ def get_sample_info(dataset: BinsToVelocityDataset, midi_filename: str):
 
 def model_predictions_review():
     # options
-    path = "models/" + st.selectbox(label="model", options=os.listdir("models"))
+    path = st.selectbox(label="model", options=glob.glob("models/*.pt"))
+
     start_index = eval(st.text_input(label="start index", value="0"))
-    run_name = '-'.join(path.split('-')[-6:-1])[:-3]
-    print(run_name)
+
     # load checkpoint
     checkpoint = torch.load(path, map_location="cpu")
+
     cols = st.columns(4)
 
     with cols[0]:
@@ -100,11 +102,15 @@ def model_predictions_review():
         pred_piece.source = true_piece.source.copy()
         tgt_piece.source = true_piece.source.copy()
 
-        name = filename.split("/")[0] + "/" + str(idx + start_index) + f"-{run_name}-" + bins
-        pred_piece.source["midi_filename"] = name + os.path.basename(filename)
+        model_dir = f"tmp/dashboard/{train_cfg.run_name}"
+        if not os.path.exists(model_dir):
+            os.mkdir(model_dir)
 
-        name = filename.split("/")[0] + "/" + str(idx + start_index) + "-target-" + bins
-        tgt_piece.source["midi_filename"] = name + os.path.basename(filename)
+        name = filename.split("/")[0] + "-" + str(idx + start_index) + "-"
+        pred_piece.source["midi_filename"] = train_cfg.run_name + "/" + name + os.path.basename(filename)
+
+        name = filename.split("/")[0] + "-" + str(idx + start_index) + "-target-" + bins + "-"
+        tgt_piece.source["midi_filename"] = train_cfg.run_name + "/" + name + os.path.basename(filename)
 
         print("Creating files ...")
         # create files
@@ -197,14 +203,14 @@ def prepare_midi_pieces(
 
     # create MidiPieces
     piece = MidiPiece(notes)
-    name = filename.split("/")[0] + "/" + str(idx) + "-real-" + bins
-    piece.source["midi_filename"] = name + os.path.basename(filename)
+    name = filename.split("/")[0] + "-" + str(idx) + "-real-" + bins + "-"
+    piece.source["midi_filename"] = "common/" + name + os.path.basename(filename)
     piece.source["title"] = title
     piece.source["composer"] = composer
 
     quantized_piece = MidiPiece(quantized_notes)
-    name = filename.split("/")[0] + "/" + str(idx) + "-quantized-" + bins
-    quantized_piece.source["midi_filename"] = name + os.path.basename(filename)
+    name = filename.split("/")[0] + "-" + str(idx) + "-quantized-" + bins + "-"
+    quantized_piece.source["midi_filename"] = "common/" + name + os.path.basename(filename)
     quantized_piece.source["title"] = title
     quantized_piece.source["composer"] = composer
 
