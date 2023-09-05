@@ -37,7 +37,7 @@ def main(cfg: DictConfig):
     )
 
 
-def load_datasets(cfg: DictConfig):
+def load_datasets(cfg: DictConfig) -> tuple[BinsToVelocityDataset, BinsToVelocityDataset] :
     train_dataset = load_cached_dataset(cfg=cfg, split="train")
     val_dataset = load_cached_dataset(cfg=cfg, split="validation")
 
