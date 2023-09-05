@@ -7,6 +7,7 @@ train:
   label_smoothing: 0.1
 
 dataset:
+  dataset_name: 'roszcz/maestro-v1'
   bins: "3 3 3"
   sequence_size: 128
 

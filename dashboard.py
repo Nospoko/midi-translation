@@ -11,7 +11,7 @@ from omegaconf import OmegaConf
 from model import make_model
 from utils import piece_av_files
 from data.dataset import BinsToVelocityDataset
-from eval import make_examples, load_test_dataset
+from evals import make_examples, load_cached_dataset
 
 
 def main():
@@ -50,7 +50,7 @@ def model_predictions_review():
 
     train_cfg = OmegaConf.create(checkpoint["cfg"])
 
-    dataset = load_test_dataset(train_cfg.dataset)
+    dataset = load_cached_dataset(train_cfg.dataset)
 
     model = make_model(
         input_size=len(dataset.src_vocab),
@@ -146,7 +146,7 @@ def tokenization_review_dashboard():
     bins = st.text_input(label="bins", value="3 3 3")
     dataset_cfg = OmegaConf.create({"bins": bins, "sequence_size": 128})
 
-    dataset = load_test_dataset(dataset_cfg)
+    dataset = load_cached_dataset(dataset_cfg)
     bins = bins.replace(" ", "-")
     n_samples = 5
     cols = st.columns(2)

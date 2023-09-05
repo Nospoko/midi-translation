@@ -68,5 +68,5 @@ You can evaluate your model and see the loss on the test dataset. For example if
 ```
 You can run:
 ```shell
-python eval.py run_name="2023-08-31-14-38"
+python evals.py run_name="2023-08-31-14-38"
 ```

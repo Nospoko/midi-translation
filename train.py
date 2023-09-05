@@ -1,8 +1,4 @@
-import os
-import json
 import time
-import pickle
-import hashlib
 from typing import Callable, Iterable
 
 import hydra
@@ -10,7 +6,6 @@ import torch
 import einops
 import torch.nn as nn
 from tqdm import tqdm
-from datasets import load_dataset
 from torch.utils.data import DataLoader
 from omegaconf import OmegaConf, DictConfig
 from torch.optim.lr_scheduler import LambdaLR
@@ -18,9 +13,9 @@ from torch.optim.lr_scheduler import LambdaLR
 import wandb
 from data.batch import Batch
 from model import make_model
-from utils import rate, distance
 from data.dataset import BinsToVelocityDataset
 from modules.label_smoothing import LabelSmoothing
+from utils import euclidean_distance, load_cached_dataset, learning_rate_schedule
 
 
 @hydra.main(version_base=None, config_path="config", config_name="conf")
@@ -43,58 +38,8 @@ def main(cfg: DictConfig):
 
 
 def load_datasets(cfg: DictConfig):
-    n_dstart_bins, n_duration_bins, n_velocity_bins = cfg.bins.split(" ")
-    n_dstart_bins, n_duration_bins, n_velocity_bins = int(n_dstart_bins), int(n_duration_bins), int(n_velocity_bins)
-
-    # create filename for the dataset
-    config_hash = hashlib.sha256()
-    config_string = json.dumps(OmegaConf.to_container(cfg))
-    config_hash.update(config_string.encode())
-    config_hash = config_hash.hexdigest()
-    cache_dir = "tmp/datasets"
-
-    train_dataset_cache_file = f"{config_hash}_train.pkl"
-    val_dataset_cache_file = f"{config_hash}_val.pkl"
-
-    train_dataset_cache_path = os.path.join(cache_dir, train_dataset_cache_file)
-    val_dataset_cache_path = os.path.join(cache_dir, val_dataset_cache_file)
-
-    # load the data if the file exists or create and cache new dataset
-    if os.path.exists(train_dataset_cache_path):
-        # using pickle because pandas.to_pickle used an older version with a bug
-        train_file = open(train_dataset_cache_path, "rb")
-        train_dataset = pickle.load(train_file)
-    else:
-        train_file = open(train_dataset_cache_path, "wb")
-        dataset = load_dataset("roszcz/maestro-v1", split="train")
-        train_dataset = BinsToVelocityDataset(
-            dataset=dataset,
-            n_dstart_bins=n_dstart_bins,
-            n_velocity_bins=n_velocity_bins,
-            n_duration_bins=n_duration_bins,
-            sequence_len=cfg.sequence_size,
-        )
-        pickle.dump(train_dataset, train_file)
-
-    if os.path.exists(val_dataset_cache_path):
-        val_file = open(val_dataset_cache_path, "rb")
-        val_dataset = pickle.load(val_file)
-    else:
-        val_file = open(val_dataset_cache_path, "wb")
-
-        dataset = load_dataset("roszcz/maestro-v1", split="validation")
-
-        val_dataset = BinsToVelocityDataset(
-            dataset=dataset,
-            n_dstart_bins=n_dstart_bins,
-            n_velocity_bins=n_velocity_bins,
-            n_duration_bins=n_duration_bins,
-            sequence_len=cfg.sequence_size,
-        )
-        pickle.dump(val_dataset, val_file)
-
-    train_file.close()
-    val_file.close()
+    train_dataset = load_cached_dataset(cfg=cfg, split="train")
+    val_dataset = load_cached_dataset(cfg=cfg, split="validation")
 
     return train_dataset, val_dataset
 
@@ -140,11 +85,11 @@ def train_model(
     train_dataloader = DataLoader(train_data, batch_size=cfg.train.batch_size, shuffle=True)
     val_dataloader = DataLoader(val_data, batch_size=cfg.train.batch_size, shuffle=True)
 
-    # Define optimizer and learning rate lr_scheduler
+    # Define optimizer and learning learning_rate_schedule lr_scheduler
     optimizer = torch.optim.Adam(model.parameters(), lr=cfg.train.base_lr, betas=(0.9, 0.98), eps=1e-9)
     lr_scheduler = LambdaLR(
         optimizer=optimizer,
-        lr_lambda=lambda step: rate(step, cfg.model.d_model, factor=1, warmup=cfg.warmup),
+        lr_lambda=lambda step: learning_rate_schedule(step, cfg.model.d_model, factor=1, warmup=cfg.warmup),
     )
     initialize_wandb(cfg)
 
@@ -226,7 +171,7 @@ def train_epoch(
         loss = criterion(out, target) / batch.ntokens
         loss.backward()
 
-        dist = distance(out, target)
+        dist = euclidean_distance(out, target)
 
         # Update the model parameters and optimizer gradients every `accum_iter` iterations
         if it % accum_iter == 0 or it == steps - 1:
@@ -235,7 +180,7 @@ def train_epoch(
             n_accum += 1
         it += 1
 
-        # Update learning rate lr_scheduler
+        # Update learning learning_rate_schedule lr_scheduler
         lr_scheduler.step()
 
         # Update loss and token counts
@@ -290,7 +235,7 @@ def val_epoch(
         total_loss += loss.item()
         total_tokens += batch.ntokens
         tokens += batch.ntokens
-        total_dist += distance(out_rearranged, target)
+        total_dist += euclidean_distance(out_rearranged, target)
 
     # Return average loss over all tokens and updated train state
     return total_loss / len(dataloader), total_dist / len(dataloader)
