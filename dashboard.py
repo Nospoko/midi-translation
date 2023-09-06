@@ -111,7 +111,7 @@ def model_predictions_review():
         name = filename.split("/")[0] + "-" + str(idx + start_index) + "-"
         pred_piece.source["midi_filename"] = train_cfg.run_name + "/" + name + os.path.basename(filename)
 
-        name = filename.split("/")[0] + "-" + str(idx) + "-qv-" + bins + "-"
+        name = filename.split("/")[0] + "-" + str(idx + start_index) + "-qv-" + bins + "-"
         quantized_vel_piece.source["midi_filename"] = "common/" + name + os.path.basename(filename)
 
         print("Creating files ...")
