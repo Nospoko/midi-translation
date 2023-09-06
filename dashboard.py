@@ -37,13 +37,15 @@ def model_predictions_review():
     # load checkpoint
     checkpoint = torch.load(path, map_location="cpu")
 
-    cols = st.columns(3)
+    cols = st.columns(4)
 
     with cols[0]:
         st.markdown("### Unchanged")
     with cols[1]:
         st.markdown("### Quantized")
     with cols[2]:
+        st.markdown("### Q. velocity")
+    with cols[3]:
         st.markdown("### Predicted")
 
     train_cfg = OmegaConf.create(checkpoint["cfg"])
@@ -70,7 +72,9 @@ def model_predictions_review():
         idx = it * 2
 
         src = results[it]["src"]
+        tgt = results[it]["tgt"]
         out = results[it]["out"]
+
         # get unprocessed data
         record = dataset.records[idx + start_index]
 
@@ -84,16 +88,21 @@ def model_predictions_review():
         # prepare unprocessed and tokenized midi pieces
         true_piece, src_piece = prepare_midi_pieces(record, source, idx=idx + start_index, dataset=dataset, bins=bins)
         pred_piece_df = true_piece.df.copy()
+        quantized_vel_df = true_piece.df.copy()
 
         # change untokenized velocities to model predictions
         # TODO: predictions are sometimes the length of 127 or 126 instead of 128 ???
         pred_piece_df["velocity"] = predicted
         pred_piece_df["velocity"] = pred_piece_df["velocity"].fillna(0)
 
+        quantized_vel_df["velocity"] = src_piece.df["velocity"]
+
         # create quantized piece with predicted velocities
         pred_piece = MidiPiece(pred_piece_df)
+        quantized_vel_piece = MidiPiece(quantized_vel_df)
 
         pred_piece.source = true_piece.source.copy()
+        quantized_vel_piece.source = true_piece.source.copy()
 
         model_dir = f"tmp/dashboard/{train_cfg.run_name}"
         if not os.path.exists(model_dir):
@@ -102,10 +111,14 @@ def model_predictions_review():
         name = filename.split("/")[0] + "-" + str(idx + start_index) + "-"
         pred_piece.source["midi_filename"] = train_cfg.run_name + "/" + name + os.path.basename(filename)
 
+        name = filename.split("/")[0] + "-" + str(idx) + "-qv-" + bins + "-"
+        quantized_vel_piece.source["midi_filename"] = "common/" + name + os.path.basename(filename)
+
         print("Creating files ...")
         # create files
         paths = piece_av_files(true_piece)
         src_piece_paths = piece_av_files(src_piece)
+        qv_paths = piece_av_files(quantized_vel_piece)
         predicted_paths = piece_av_files(pred_piece)
 
         # create a dashboard
@@ -120,6 +133,11 @@ def model_predictions_review():
             st.table(src_piece.source)
 
         with cols[2]:
+            st.image(qv_paths["pianoroll_path"])
+            st.audio(qv_paths["mp3_path"])
+            st.table(quantized_vel_piece.source)
+
+        with cols[3]:
             st.image(predicted_paths["pianoroll_path"])
             st.audio(predicted_paths["mp3_path"])
             st.table(pred_piece.source)
