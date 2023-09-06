@@ -75,7 +75,7 @@ def model_predictions_review():
         out = results[it]["out"]
 
         # get unprocessed data
-        record = dataset.unprocessed_records[idx + start_index]
+        record = dataset.processed_records[idx + start_index]
 
         # get untokenized source data
         source = dataset.tokenizer_src.untokenize(src)

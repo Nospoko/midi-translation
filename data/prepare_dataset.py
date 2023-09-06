@@ -54,19 +54,27 @@ def process_record(piece: ff.MidiPiece, sequence_len: int, quantizer: MidiQuanti
     midi_filename = piece_quantized.source["midi_filename"]
 
     record = []
-
     step = sequence_len // 2
-    for subset in piece_quantized.df.rolling(window=sequence_len, step=step):
+    iterator = zip(
+        piece.df.rolling(window=sequence_len, step=step),
+        piece_quantized.df.rolling(window=sequence_len, step=step),
+    )
+
+    for subset, quantized in iterator:
         # rolling sometimes creates subsets with shorter sequence length, they are filtered here
-        if len(subset) != sequence_len:
+        if len(quantized) != sequence_len:
             continue
 
         sequence = {
             "midi_filename": midi_filename,
-            "pitch": subset.pitch.astype("int16").values.T,
-            "dstart_bin": subset.dstart_bin.astype("int16").values.T,
-            "duration_bin": subset.duration_bin.astype("int16").values.T,
-            "velocity_bin": subset.velocity_bin.astype("int16").values.T,
+            "pitch": quantized.pitch.astype("int16").values.T,
+            "dstart_bin": quantized.dstart_bin.astype("int16").values.T,
+            "duration_bin": quantized.duration_bin.astype("int16").values.T,
+            "velocity_bin": quantized.velocity_bin.astype("int16").values.T,
+            "start": subset.start.values,
+            "end": subset.end.values,
+            "duration": subset.duration.values,
+            "velocity": subset.velocity.values,
         }
 
         record.append(sequence)

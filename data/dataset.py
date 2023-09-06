@@ -7,8 +7,8 @@ from tqdm import tqdm
 from datasets import Dataset
 
 from data.quantizer import MidiQuantizer
+from data.prepare_dataset import process_record
 from data.tokenizer import Tokenizer, VelocityTokenizer
-from data.prepare_dataset import process_record, unprocessed_samples
 
 
 class TokenizedMidiDataset:
@@ -36,16 +36,16 @@ class TokenizedMidiDataset:
 
         self.src_vocab, self.tgt_vocab = self.build_vocab()
 
-        self.processed_records, self.unprocessed_records = self._build_dataset()
+        self.processed_records = self._build_dataset()
         self.samples = self.load_samples()
 
     def load_samples(self) -> list[tuple[list[int], list[int]]]:
         samples = []
 
-        pbar = tqdm(zip(self.processed_records, self.unprocessed_records), total=len(self.processed_records))
+        pbar = tqdm(self.processed_records, total=len(self.processed_records))
 
         print("Tokenizing ... ")
-        for processed_record, unprocessed_record in pbar:
+        for processed_record in pbar:
             src_tokens = self.tokenizer_src(processed_record)
             tgt_tokens = self.tokenizer_tgt(processed_record)
 
@@ -59,9 +59,8 @@ class TokenizedMidiDataset:
 
         return samples
 
-    def _build_dataset(self) -> tuple[list[dict], list[dict]]:
+    def _build_dataset(self) -> list[dict]:
         processed_records = []
-        unprocessed_records = []
 
         print("Building a dataset ...")
         for record in tqdm(self.dataset, total=self.dataset.num_rows):
@@ -69,12 +68,10 @@ class TokenizedMidiDataset:
             piece = ff.MidiPiece.from_huggingface(record)
 
             processed_record = process_record(piece, self.sequence_len, self.quantizer)
-            unprocessed_record = unprocessed_samples(piece, self.sequence_len)
 
-            unprocessed_records += unprocessed_record
             processed_records += processed_record
 
-        return processed_records, unprocessed_records
+        return processed_records
 
     def build_vocab(self) -> tuple[list[str], list[str]]:
         vocab_src, vocab_tgt = ["<s>", "<blank>", "</s>"], ["<s>", "<blank>", "</s>"]
@@ -157,12 +154,12 @@ class BinsToVelocityDataset(TokenizedMidiDataset):
     def load_samples(self) -> list[tuple[list[int], list[int]]]:
         samples = []
 
-        pbar = tqdm(zip(self.processed_records, self.unprocessed_records), total=len(self.processed_records))
+        pbar = tqdm(self.processed_records, total=len(self.processed_records))
 
         print("Tokenizing ... ")
-        for processed_record, unprocessed_record in pbar:
+        for processed_record in pbar:
             src_tokens = self.tokenizer_src(processed_record)
-            tgt_tokens = self.tokenizer_tgt(unprocessed_record)
+            tgt_tokens = self.tokenizer_tgt(processed_record)
 
             src_processed = [self.src_vocab.index(token) for token in src_tokens]
             tgt_processed = [self.tgt_vocab.index(token) for token in tgt_tokens]
@@ -177,16 +174,18 @@ class BinsToVelocityDataset(TokenizedMidiDataset):
 def main():
     src_tokenizer = Tokenizer(keys=["pitch", "dstart_bin"])
     tgt_tokenizer = Tokenizer(keys=["duration_bin", "velocity_bin"])
+    from datasets import load_dataset
+
+    hf_dataset = load_dataset("roszcz/maestro-v1", split="validation")
     dataset = TokenizedMidiDataset(
         src_tokenizer=src_tokenizer,
         tgt_tokenizer=tgt_tokenizer,
-        split="validation",
-        n_dstart_bins=3,
+        dataset=hf_dataset,
+        n_dstart_bins=5,
         n_duration_bins=3,
         n_velocity_bins=3,
     )
 
-    unprocessed_record = dataset.unprocessed_records[0]
     processed_record = dataset.processed_records[0]
     processed_df = pd.DataFrame(processed_record)
 
@@ -201,7 +200,6 @@ def main():
     sample = dataset[0]
 
     print(
-        f"Unprocessed record: \n {unprocessed_record} \n "
         f"Quantized record: \n {quantized_record}"
         f"Processed record: {processed_record} \n"
         f"untokenized record: {src_untokenized} \n"
