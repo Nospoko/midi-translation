@@ -18,7 +18,7 @@ def piece_av_files(piece: MidiPiece) -> dict:
     # stolen from Tomek
     midi_file = piece.source["midi_filename"]
     mp3_path = midi_file.replace(".midi", ".mp3")
-    mp3_path = os.path.join("tmp/dashboard", mp3_path)
+
     if not os.path.exists(mp3_path):
         render_audio.midi_to_mp3(piece.to_midi(), mp3_path)
 
