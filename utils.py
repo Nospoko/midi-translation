@@ -69,9 +69,9 @@ def load_cached_dataset(cfg: DictConfig, split="test") -> BinsToVelocityDataset:
         dataset = pickle.load(file)
     else:
         file = open(dataset_cache_path, "wb")
-        dataset = load_dataset(cfg.dataset_name, split=split)
+        hf_dataset = load_dataset(cfg.dataset_name, split=split)
         dataset = BinsToVelocityDataset(
-            dataset=dataset,
+            dataset=hf_dataset,
             n_dstart_bins=n_dstart_bins,
             n_velocity_bins=n_velocity_bins,
             n_duration_bins=n_duration_bins,
