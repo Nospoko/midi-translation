@@ -78,4 +78,5 @@ def load_cached_dataset(cfg: DictConfig, split="test") -> BinsToVelocityDataset:
             sequence_len=cfg.sequence_size,
         )
         pickle.dump(dataset, file)
+    file.close()
     return dataset
