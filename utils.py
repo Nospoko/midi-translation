@@ -23,7 +23,7 @@ def piece_av_files(piece: MidiPiece) -> dict:
         render_audio.midi_to_mp3(piece.to_midi(), mp3_path)
 
     pianoroll_path = midi_file.replace(".midi", ".png")
-    pianoroll_path = os.path.join("tmp/dashboard/", pianoroll_path)
+
     if not os.path.exists(pianoroll_path):
         ff.view.draw_pianoroll_with_velocities(piece)
         plt.tight_layout()
