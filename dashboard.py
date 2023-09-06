@@ -34,9 +34,6 @@ def model_predictions_review():
 
     start_index = eval(st.text_input(label="start index", value="0"))
 
-    # load checkpoint
-    checkpoint = torch.load(path, map_location="cpu")
-
     cols = st.columns(4)
 
     with cols[0]:
@@ -48,6 +45,8 @@ def model_predictions_review():
     with cols[3]:
         st.markdown("### Predicted")
 
+    # load checkpoint
+    checkpoint = torch.load(path, map_location="cpu")
     train_cfg = OmegaConf.create(checkpoint["cfg"])
 
     dataset = load_cached_dataset(train_cfg.dataset)
@@ -72,7 +71,6 @@ def model_predictions_review():
         idx = it * 2
 
         src = results[it]["src"]
-        tgt = results[it]["tgt"]
         out = results[it]["out"]
 
         # get unprocessed data
@@ -95,7 +93,7 @@ def model_predictions_review():
         pred_piece_df["velocity"] = predicted
         pred_piece_df["velocity"] = pred_piece_df["velocity"].fillna(0)
 
-        quantized_vel_df["velocity"] = src_piece.df["velocity"]
+        quantized_vel_df["velocity"] = src_piece.df["velocity"].copy()
 
         # create quantized piece with predicted velocities
         pred_piece = MidiPiece(pred_piece_df)
@@ -109,10 +107,11 @@ def model_predictions_review():
             os.mkdir(model_dir)
 
         name = filename.split("/")[0] + "-" + str(idx + start_index) + "-"
-        pred_piece.source["midi_filename"] = train_cfg.run_name + "/" + name + os.path.basename(filename)
+        directory = 'tmp/dashboard/'
+        pred_piece.source["midi_filename"] = directory + train_cfg.run_name + "/" + name + os.path.basename(filename)
 
         name = filename.split("/")[0] + "-" + str(idx + start_index) + "-qv-" + bins + "-"
-        quantized_vel_piece.source["midi_filename"] = "common/" + name + os.path.basename(filename)
+        quantized_vel_piece.source["midi_filename"] = directory + "common/" + name + os.path.basename(filename)
 
         print("Creating files ...")
         # create files
