@@ -36,13 +36,13 @@ class TokenizedMidiDataset:
 
         self.src_vocab, self.tgt_vocab = self.build_vocab()
 
-        self.processed_records = self._build_dataset()
+        self.records = self._build_dataset()
         self.samples = self.load_samples()
 
     def load_samples(self) -> list[tuple[list[int], list[int]]]:
         samples = []
 
-        pbar = tqdm(self.processed_records, total=len(self.processed_records))
+        pbar = tqdm(self.records, total=len(self.records))
 
         print("Tokenizing ... ")
         for processed_record in pbar:
@@ -154,7 +154,7 @@ class BinsToVelocityDataset(TokenizedMidiDataset):
     def load_samples(self) -> list[tuple[list[int], list[int]]]:
         samples = []
 
-        pbar = tqdm(self.processed_records, total=len(self.processed_records))
+        pbar = tqdm(self.records, total=len(self.records))
 
         print("Tokenizing ... ")
         for processed_record in pbar:
@@ -186,7 +186,7 @@ def main():
         n_velocity_bins=3,
     )
 
-    processed_record = dataset.processed_records[0]
+    processed_record = dataset.records[0]
     processed_df = pd.DataFrame(processed_record)
 
     quantized_record = dataset.quantizer.apply_quantization(processed_df)

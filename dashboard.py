@@ -75,7 +75,7 @@ def model_predictions_review():
         out = results[it]["out"]
 
         # get unprocessed data
-        record = dataset.processed_records[idx + start_index]
+        record = dataset.records[idx + start_index]
 
         # get untokenized source data
         source = dataset.tokenizer_src.untokenize(src)
@@ -144,7 +144,7 @@ def model_predictions_review():
 def tokenization_review_dashboard():
     st.markdown("### Tokenization method:\n" "**n_dstart_bins    n_duration_bins    n_velocity_bins**")
     bins = st.text_input(label="bins", value="3 3 3")
-    dataset_cfg = OmegaConf.create({"bins": bins, "sequence_size": 128})
+    dataset_cfg = OmegaConf.create({"dataset_name": "roszcz/maestro-v1", "bins": bins, "sequence_size": 128})
 
     dataset = load_cached_dataset(dataset_cfg)
     bins = bins.replace(" ", "-")
@@ -158,8 +158,8 @@ def tokenization_review_dashboard():
     indexes = torch.randint(0, len(dataset), [n_samples])
     for idx in indexes:
         piece, quantized_piece = prepare_midi_pieces(
-            unprocessed=dataset.unprocessed_records[idx],
-            processed=dataset.processed_records[idx],
+            record=dataset.records[idx],
+            processed=dataset.records[idx],
             idx=idx,
             dataset=dataset,
             bins=bins,
@@ -180,12 +180,12 @@ def tokenization_review_dashboard():
 
 
 def prepare_midi_pieces(
-    unprocessed: dict, processed: dict, idx: int, dataset: BinsToVelocityDataset, bins: str = "3-3-3"
+    record: dict, processed: dict, idx: int, dataset: BinsToVelocityDataset, bins: str = "3-3-3"
 ) -> tuple[MidiPiece, MidiPiece]:
     # get dataframes with notes
     processed_df = pd.DataFrame(processed)
 
-    notes = pd.DataFrame(unprocessed)
+    notes = pd.DataFrame(record)
     quantized_notes = dataset.quantizer.apply_quantization(processed_df)
     # we have to pop midi_filename column
     filename = notes.pop("midi_filename")[0]
