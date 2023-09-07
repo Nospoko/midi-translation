@@ -11,13 +11,16 @@ from omegaconf import OmegaConf
 from model import make_model
 from utils import piece_av_files
 from data.dataset import BinsToVelocityDataset
+from predict_piece import predict_piece_dashboard
 from evals import make_examples, load_cached_dataset
 
 
 def main():
-    mode = st.selectbox(label="Display", options=["Model predictions", "Tokenization review"])
+    mode = st.selectbox(label="Display", options=["Model predictions", "Predict piece", "Tokenization review"])
     if mode == "Tokenization review":
         tokenization_review_dashboard()
+    if mode == "Predict piece":
+        predict_piece_dashboard()
     if mode == "Model predictions":
         model_predictions_review()
 
@@ -59,6 +62,7 @@ def model_predictions_review():
         h=train_cfg.model.h,
         dropout=train_cfg.model.dropout,
     )
+    model.load_state_dict(checkpoint["model_state_dict"])
 
     n_samples = 5
     # predict velocities and get src, tgt and model output
@@ -107,7 +111,7 @@ def model_predictions_review():
             os.mkdir(model_dir)
 
         name = filename.split("/")[0] + "-" + str(idx + start_index) + "-"
-        directory = 'tmp/dashboard/'
+        directory = "tmp/dashboard/"
         pred_piece.source["midi_filename"] = model_dir + "/" + name + os.path.basename(filename)
 
         name = filename.split("/")[0] + "-" + str(idx + start_index) + "-qv-" + bins + "-"
