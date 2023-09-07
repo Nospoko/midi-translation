@@ -118,10 +118,12 @@ def predict_piece_dashboard():
     print(f"{avg_loss:6.2f}, {avg_dist:6.2f}")
 
     with cols[0]:
+        st.markdown("### True")
         st.image(paths["pianoroll_path"])
         st.audio(paths["mp3_path"])
         st.table(piece.source)
     with cols[1]:
+        st.markdown("### Predicted")
         st.image(pred_paths["pianoroll_path"])
         st.audio(pred_paths["mp3_path"])
         st.table(predicted_piece.source)
