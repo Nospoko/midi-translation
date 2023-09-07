@@ -110,11 +110,11 @@ def model_predictions_review():
         if not os.path.exists(model_dir):
             os.mkdir(model_dir)
 
-        name = filename.split("/")[0] + "-" + str(idx + start_index) + "-"
+        name = f"{filename.split('/')[0]}-{idx + start_index}-"
         directory = "tmp/dashboard/"
         pred_piece.source["midi_filename"] = model_dir + "/" + name + os.path.basename(filename)
 
-        name = filename.split("/")[0] + "-" + str(idx + start_index) + "-qv-" + bins + "-"
+        name = f"{filename.split('/')[0]}-{idx + start_index}-qv-{bins}-{dataset.sequence_len}-"
         quantized_vel_piece.source["midi_filename"] = directory + "common/" + name + os.path.basename(filename)
 
         print("Creating files ...")
@@ -208,13 +208,13 @@ def prepare_midi_pieces(
 
     # create MidiPieces
     piece = MidiPiece(notes)
-    name = filename.split("/")[0] + "-" + str(idx) + "-real-" + bins + "-"
+    name = filename.split("/")[0] + "-" + str(idx) + "-real-" + bins + "-" + str(dataset.sequence_len) + "-"
     piece.source["midi_filename"] = "tmp/dashboard/common/" + name + os.path.basename(filename)
     piece.source["title"] = title
     piece.source["composer"] = composer
 
     quantized_piece = MidiPiece(quantized_notes)
-    name = filename.split("/")[0] + "-" + str(idx) + "-quantized-" + bins + "-"
+    name = filename.split("/")[0] + "-" + str(idx) + "-quantized-" + bins + "-" + str(dataset.sequence_len) + "-"
     quantized_piece.source["midi_filename"] = "tmp/dashboard/common/" + name + os.path.basename(filename)
     quantized_piece.source["title"] = title
     quantized_piece.source["composer"] = composer
