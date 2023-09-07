@@ -157,7 +157,7 @@ def greedy_decode(
         out = model.decode(memory, src_mask, sentence, sub_mask)
 
         prob = model.generator(out[:, -1])
-        _, next_word = prob.max(dim=1)
+        next_word = prob.argmax(dim=1)
         next_word = next_word.data[0]
 
         sentence = torch.cat([sentence, torch.Tensor([[next_word]]).type_as(src.data)], dim=1)

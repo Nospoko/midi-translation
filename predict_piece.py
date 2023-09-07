@@ -11,6 +11,7 @@ from torch.utils.data import DataLoader
 
 from data.batch import Batch
 from model import make_model
+from evals import greedy_decode
 from data.dataset import BinsToVelocityDataset
 from modules.label_smoothing import LabelSmoothing
 from utils import piece_av_files, euclidean_distance
@@ -80,6 +81,10 @@ def predict_piece_dashboard():
             continue
         batch = Batch(b[0], b[1], pad=pad_idx)
         batch.to(dev)
+        sequence = greedy_decode(
+            model=model, src=batch.src[0], src_mask=batch.src_mask[0], max_len=train_cfg.dataset.sequence_size, start_symbol=0
+        )
+        predicted = torch.concat([predicted, sequence[1:]]).type_as(sequence.data)
 
         encoded_decoded = model.forward(batch.src, batch.tgt, batch.src_mask, batch.tgt_mask)
         out = model.generator(encoded_decoded)
@@ -89,10 +94,10 @@ def predict_piece_dashboard():
         loss = criterion(out_rearranged, target) / batch.ntokens
         total_loss += loss.item()
         total_dist += euclidean_distance(out_rearranged, target)
-        predicted = torch.concat([predicted, out_rearranged])
 
     print(len(predicted))
-    predicted = [dataset.tgt_vocab[x] for x in predicted.argmax(dim=1)]
+
+    predicted = [dataset.tgt_vocab[x] for x in predicted]
     pred_velocities = dataset.tokenizer_tgt.untokenize(predicted)
     predicted_piece_df = predicted_piece_df.head(len(pred_velocities))
 
@@ -100,8 +105,8 @@ def predict_piece_dashboard():
     predicted_piece = MidiPiece(predicted_piece_df)
     predicted_piece.source = piece.source.copy()
     midi_filename = piece.source["midi_filename"].replace("/", "-")
-    predicted_piece.source["midi_filename"] = f"documentation/files/{midi_filename}-{train_cfg.run_name}-pred.midi"
-    piece.source["midi_filename"] = f"documentation/files/{midi_filename}"
+    predicted_piece.source["midi_filename"] = f"tmp/dashboard/{midi_filename}-{train_cfg.run_name}-pred.midi"
+    piece.source["midi_filename"] = f"tmp/dashboard/common/{midi_filename}"
     pred_paths = piece_av_files(predicted_piece)
     paths = piece_av_files(piece)
 
