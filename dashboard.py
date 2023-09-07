@@ -108,7 +108,7 @@ def model_predictions_review():
 
         name = filename.split("/")[0] + "-" + str(idx + start_index) + "-"
         directory = 'tmp/dashboard/'
-        pred_piece.source["midi_filename"] = directory + train_cfg.run_name + "/" + name + os.path.basename(filename)
+        pred_piece.source["midi_filename"] = model_dir + "/" + name + os.path.basename(filename)
 
         name = filename.split("/")[0] + "-" + str(idx + start_index) + "-qv-" + bins + "-"
         quantized_vel_piece.source["midi_filename"] = directory + "common/" + name + os.path.basename(filename)
@@ -205,13 +205,13 @@ def prepare_midi_pieces(
     # create MidiPieces
     piece = MidiPiece(notes)
     name = filename.split("/")[0] + "-" + str(idx) + "-real-" + bins + "-"
-    piece.source["midi_filename"] = "common/" + name + os.path.basename(filename)
+    piece.source["midi_filename"] = "tmp/dashboard/common/" + name + os.path.basename(filename)
     piece.source["title"] = title
     piece.source["composer"] = composer
 
     quantized_piece = MidiPiece(quantized_notes)
     name = filename.split("/")[0] + "-" + str(idx) + "-quantized-" + bins + "-"
-    quantized_piece.source["midi_filename"] = "common/" + name + os.path.basename(filename)
+    quantized_piece.source["midi_filename"] = "tmp/dashboard/common/" + name + os.path.basename(filename)
     quantized_piece.source["title"] = title
     quantized_piece.source["composer"] = composer
 
