@@ -6,3 +6,4 @@ tmp/*
 outputs/*
 wandb/*
 models/*
+documentation/files

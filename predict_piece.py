@@ -24,7 +24,7 @@ def main(cfg):
     train_cfg = OmegaConf.create(checkpoint['cfg'])
 
     n_dstart_bins, n_duration_bins, n_velocity_bins = train_cfg.dataset.bins.split(' ')
-    hf_dataset = load_dataset('roszcz/maestro-v1', split='validation')
+    hf_dataset = load_dataset('roszcz/maestro-v1', split='test')
     for composer, title in zip(hf_dataset['composer'], hf_dataset['title']):
         print(composer, title)
     one_record_dataset = hf_dataset.filter(lambda x: x['composer'] == cfg.composer and x['title'] == cfg.title)
