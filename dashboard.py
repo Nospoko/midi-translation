@@ -51,13 +51,13 @@ def model_predictions_review():
     # load checkpoint
     checkpoint = torch.load(path, map_location="cpu")
     train_cfg = OmegaConf.create(checkpoint["cfg"])
-
     dataset = load_cached_dataset(train_cfg.dataset)
 
     model = make_model(
         input_size=len(dataset.src_vocab),
         output_size=len(dataset.tgt_vocab),
         n=train_cfg.model.n,
+        d_model=train_cfg.model.d_model,
         d_ff=train_cfg.model.d_ff,
         h=train_cfg.model.h,
         dropout=train_cfg.model.dropout,
