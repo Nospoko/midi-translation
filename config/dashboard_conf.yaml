@@ -1,0 +1,7 @@
+device: "cpu"
+
+dataset_split: "test"
+dataset:
+  dataset_name: null
+  bins: null
+  sequence_size: null

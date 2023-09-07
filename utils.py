@@ -60,6 +60,7 @@ def load_cached_dataset(cfg: DictConfig, split="test") -> BinsToVelocityDataset:
     config_hash.update(config_string.encode())
     config_hash = config_hash.hexdigest()
     cache_dir = "tmp/datasets"
+    print(f"Preparing dataset: {config_hash}")
 
     dataset_cache_file = f"{config_hash}.pkl"
     dataset_cache_path = os.path.join(cache_dir, dataset_cache_file)

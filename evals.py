@@ -23,7 +23,13 @@ def main(cfg):
         device=cfg.device,
     )
     train_cfg = OmegaConf.create(checkpoint["cfg"])
-    val_data = load_cached_dataset(train_cfg.dataset)
+    if cfg.dataset.dataset_name is None:
+        val_data = load_cached_dataset(train_cfg.dataset, split=cfg.dataset_split)
+    else:
+        cfg.dataset.bins = train_cfg.dataset.bins
+        cfg.dataset.sequence_size = train_cfg.dataset.sequence_size
+        val_data = load_cached_dataset(cfg.dataset, split=cfg.dataset_split)
+
 
     dataloader = DataLoader(val_data, batch_size=train_cfg.train.batch_size)
 
@@ -56,6 +62,7 @@ def main(cfg):
             dataloader=dataloader,
             model=model,
             criterion=criterion,
+            device=cfg.device,
         )
         print(f"Model loss:   {loss}")
 
@@ -66,6 +73,7 @@ def main(cfg):
             model=model,
             n_examples=cfg.n_examples,
             random=cfg.random,
+            device=cfg.device,
         )
 
         for translation in translations:
@@ -98,6 +106,7 @@ def make_examples(
     n_examples: int = 5,
     eos_string: str = "</s>",
     random: bool = False,
+    device: str = 'cpu'
 ):
     results = []
     pad_idx = dataset.tgt_vocab.index("<blank>")
@@ -122,6 +131,7 @@ def make_examples(
                 src_mask=record.src_mask,
                 max_len=dataset.sequence_len,
                 start_symbol=0,
+                device=device,
             )
 
             model_txt = [dataset.tgt_vocab[x] for x in decoded_record if x != pad_idx]
@@ -144,23 +154,24 @@ def greedy_decode(
     src_mask: torch.Tensor,
     max_len: int,
     start_symbol: int,
+    device: str = 'cpu'
 ) -> torch.Tensor:
     # Pretend to be batches
     src = src.unsqueeze(0)
     src_mask = src_mask.unsqueeze(0)
-
+    dev = torch.device(device)
     memory = model.encode(src, src_mask)
     # Create a tensor and put start symbol inside
-    sentence = torch.Tensor([[start_symbol]]).type_as(src.data)
+    sentence = torch.Tensor([[start_symbol]], device=dev).type_as(src.data)
     for _ in range(max_len):
-        sub_mask = subsequent_mask(sentence.size(1)).type_as(src.data)
+        sub_mask = subsequent_mask(sentence.size(1)).type_as(src.data).to(device)
         out = model.decode(memory, src_mask, sentence, sub_mask)
 
         prob = model.generator(out[:, -1])
         next_word = prob.argmax(dim=1)
         next_word = next_word.data[0]
 
-        sentence = torch.cat([sentence, torch.Tensor([[next_word]]).type_as(src.data)], dim=1)
+        sentence = torch.cat([sentence, torch.Tensor([[next_word]], device=dev).type_as(src.data)], dim=1)
 
     # Don't pretend to be a batch
     return sentence[0]

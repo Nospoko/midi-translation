@@ -6,23 +6,26 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 from fortepyan import MidiPiece
+from hydra.core.global_hydra import GlobalHydra
 from omegaconf import OmegaConf
-
+import hydra
 from model import make_model
 from utils import piece_av_files
 from data.dataset import BinsToVelocityDataset
 from predict_piece import predict_piece_dashboard
 from evals import make_examples, load_cached_dataset
+from omegaconf import DictConfig
 
 
-def main():
+@hydra.main(version_base=None, config_path="config", config_name="dashboard_conf")
+def main(cfg: DictConfig):
     mode = st.selectbox(label="Display", options=["Model predictions", "Predict piece", "Tokenization review"])
     if mode == "Tokenization review":
         tokenization_review_dashboard()
     if mode == "Predict piece":
-        predict_piece_dashboard()
+        predict_piece_dashboard(cfg)
     if mode == "Model predictions":
-        model_predictions_review()
+        model_predictions_review(cfg)
 
 
 def get_sample_info(dataset: BinsToVelocityDataset, midi_filename: str):
@@ -31,7 +34,7 @@ def get_sample_info(dataset: BinsToVelocityDataset, midi_filename: str):
     return title, composer
 
 
-def model_predictions_review():
+def model_predictions_review(cfg: DictConfig):
     # options
     path = st.selectbox(label="model", options=glob.glob("models/*.pt"))
 
@@ -49,9 +52,14 @@ def model_predictions_review():
         st.markdown("### Predicted")
 
     # load checkpoint
-    checkpoint = torch.load(path, map_location="cpu")
+    checkpoint = torch.load(path, map_location=cfg.device)
     train_cfg = OmegaConf.create(checkpoint["cfg"])
-    dataset = load_cached_dataset(train_cfg.dataset)
+    if cfg.dataset.dataset_name is None:
+        dataset = load_cached_dataset(train_cfg.dataset)
+    else:
+        cfg.dataset.bins = train_cfg.dataset.bins
+        cfg.dataset.sequence_size = train_cfg.dataset.sequence_size
+        dataset = load_cached_dataset(cfg.dataset, split=cfg.dataset_split)
 
     model = make_model(
         input_size=len(dataset.src_vocab),
@@ -195,7 +203,7 @@ def prepare_midi_pieces(
     # we have to pop midi_filename column
     filename = notes.pop("midi_filename")[0]
     # print(filename)
-    title, composer = get_sample_info(dataset=dataset, midi_filename=filename)
+    # title, composer = get_sample_info(dataset=dataset, midi_filename=filename)
 
     start_time = np.min(notes["start"])
 
@@ -210,17 +218,18 @@ def prepare_midi_pieces(
     piece = MidiPiece(notes)
     name = filename.split("/")[0] + "-" + str(idx) + "-real-" + bins + "-" + str(dataset.sequence_len) + "-"
     piece.source["midi_filename"] = "tmp/dashboard/common/" + name + os.path.basename(filename)
-    piece.source["title"] = title
-    piece.source["composer"] = composer
+    # piece.source["title"] = title
+    # piece.source["composer"] = composer
 
     quantized_piece = MidiPiece(quantized_notes)
     name = filename.split("/")[0] + "-" + str(idx) + "-quantized-" + bins + "-" + str(dataset.sequence_len) + "-"
     quantized_piece.source["midi_filename"] = "tmp/dashboard/common/" + name + os.path.basename(filename)
-    quantized_piece.source["title"] = title
-    quantized_piece.source["composer"] = composer
+    # quantized_piece.source["title"] = title
+    # quantized_piece.source["composer"] = composer
 
     return piece, quantized_piece
 
 
 if __name__ == "__main__":
+    GlobalHydra.instance().clear()
     main()

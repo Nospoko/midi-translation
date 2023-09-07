@@ -1,11 +1,12 @@
 import glob
 
+import hydra
 import torch
 import einops
 import streamlit as st
 from tqdm import tqdm
 from fortepyan import MidiPiece
-from omegaconf import OmegaConf
+from omegaconf import OmegaConf, DictConfig
 from datasets import load_dataset
 from torch.utils.data import DataLoader
 
@@ -18,14 +19,14 @@ from utils import piece_av_files, euclidean_distance
 
 
 @torch.no_grad()
-def predict_piece_dashboard():
+def predict_piece_dashboard(cfg: DictConfig):
     model_path = st.selectbox(label="model", options=glob.glob("models/*.pt"))
-    device = "cpu"
-    checkpoint = torch.load(model_path, map_location=device)
-    train_cfg = OmegaConf.create(checkpoint["cfg"])
 
+    checkpoint = torch.load(model_path, map_location=cfg.device)
+    train_cfg = OmegaConf.create(checkpoint["cfg"])
+    dev = torch.device(cfg.device)
     n_dstart_bins, n_duration_bins, n_velocity_bins = train_cfg.dataset.bins.split(" ")
-    hf_dataset = load_dataset("roszcz/maestro-v1", split="test")
+    hf_dataset = load_dataset(cfg.dataset.dataset_name, split=cfg.dataset_split)
 
     pieces_names = zip(hf_dataset["composer"], hf_dataset["title"])
     composer, title = st.selectbox(
@@ -53,7 +54,7 @@ def predict_piece_dashboard():
         d_ff=train_cfg.model.d_ff,
         dropout=train_cfg.model.dropout,
     )
-    model.to(device)
+    model.to(dev)
     model.load_state_dict(checkpoint["model_state_dict"])
     pad_idx = dataset.tgt_vocab.index("<blank>")
 
@@ -62,12 +63,12 @@ def predict_piece_dashboard():
         padding_idx=pad_idx,
         smoothing=train_cfg.train.label_smoothing,
     )
-    criterion.to(device)
+    criterion.to(dev)
 
     total_loss = 0
     total_dist = 0
 
-    dev = torch.device(device)
+    dev = torch.device(dev)
     dataloader = DataLoader(dataset, batch_size=1)
 
     piece = MidiPiece.from_huggingface(one_record_dataset[0])
@@ -94,8 +95,6 @@ def predict_piece_dashboard():
         loss = criterion(out_rearranged, target) / batch.ntokens
         total_loss += loss.item()
         total_dist += euclidean_distance(out_rearranged, target)
-
-    print(len(predicted))
 
     predicted = [dataset.tgt_vocab[x] for x in predicted]
     pred_velocities = dataset.tokenizer_tgt.untokenize(predicted)
@@ -129,5 +128,10 @@ def predict_piece_dashboard():
         st.table(predicted_piece.source)
 
 
+@hydra.main(version_base=None, config_path="config", config_name="dashboard_conf")
+def main(cfg):
+    predict_piece_dashboard(cfg)
+
+
 if __name__ == "__main__":
-    predict_piece_dashboard()
+    main()
