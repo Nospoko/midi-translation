@@ -29,6 +29,7 @@ train:
   label_smoothing: 0.1
 
 dataset:
+  dataset_name: "roszcz/maestro-v1"
   bins: "3 3 3"
   sequence_size: 128
 device: "cpu"
@@ -60,6 +61,9 @@ When you have trained your model, you can listen to and compare model prediction
 Run the same command and choose "Model predictions" option.
 
 ![image](https://github.com/Nospoko/midi-translation/assets/74838859/efe5746f-4d15-49e2-9bc3-d4dfdf5f558c)
+
+#### Predict piece
+You can choose a model to predict velocities of any piece from test dataset.
 
 ### Eval
 You can evaluate your model and see the loss on the test dataset. For example if you have a model weights file called
