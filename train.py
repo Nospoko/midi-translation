@@ -35,6 +35,7 @@ def main(cfg: DictConfig):
         },
         path,
     )
+    print(cfg.run_name)
 
 
 def load_datasets(cfg: DictConfig) -> tuple[BinsToVelocityDataset, BinsToVelocityDataset]:
