@@ -17,12 +17,12 @@ from data.dataset import BinsToVelocityDataset
 def piece_av_files(piece: MidiPiece) -> dict:
     # stolen from Tomek
     midi_file = piece.source["midi_filename"]
-    mp3_path = midi_file.replace(".midi", ".mp3")
+    mp3_path = midi_file.replace(".midi", ".mp3").replace(".mid", ".mp3")
 
     if not os.path.exists(mp3_path):
         render_audio.midi_to_mp3(piece.to_midi(), mp3_path)
 
-    pianoroll_path = midi_file.replace(".midi", ".png")
+    pianoroll_path = midi_file.replace(".midi", ".png").replace(".mid", ".png")
 
     if not os.path.exists(pianoroll_path):
         ff.view.draw_pianoroll_with_velocities(piece)

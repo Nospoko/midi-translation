@@ -2,6 +2,6 @@ device: "cpu"
 
 dataset_split: "test"
 dataset:
-  dataset_name: null
+  dataset_name: "roszcz/giant-midi-sustain"
   bins: null
   sequence_size: null

@@ -27,14 +27,21 @@ def predict_piece_dashboard(cfg: DictConfig):
     dev = torch.device(cfg.device)
     n_dstart_bins, n_duration_bins, n_velocity_bins = train_cfg.dataset.bins.split(" ")
     hf_dataset = load_dataset(cfg.dataset.dataset_name, split=cfg.dataset_split)
+    if cfg.dataset.dataset_name == "roszcz/maestro-v1":
+        pieces_names = zip(hf_dataset["composer"], hf_dataset["title"])
+        composer, title = st.selectbox(
+            label="piece",
+            options=[composer + "    " + title for composer, title in pieces_names],
+        ).split("    ")
 
-    pieces_names = zip(hf_dataset["composer"], hf_dataset["title"])
-    composer, title = st.selectbox(
-        label="piece",
-        options=[composer + "    " + title for composer, title in pieces_names],
-    ).split("    ")
+        one_record_dataset = hf_dataset.filter(lambda x: x["composer"] == composer and x["title"] == title)
+    else:
+        midi_filename = st.selectbox(
+            label="piece",
+            options=[filename for filename in hf_dataset['midi_filename']]
+        )
+        one_record_dataset = hf_dataset.filter(lambda x: x['midi_filename'] == midi_filename)
 
-    one_record_dataset = hf_dataset.filter(lambda x: x["composer"] == composer and x["title"] == title)
     dataset = BinsToVelocityDataset(
         dataset=one_record_dataset,
         n_dstart_bins=eval(n_dstart_bins),
@@ -54,8 +61,8 @@ def predict_piece_dashboard(cfg: DictConfig):
         d_ff=train_cfg.model.d_ff,
         dropout=train_cfg.model.dropout,
     )
-    model.to(dev)
     model.load_state_dict(checkpoint["model_state_dict"])
+    model.to(dev)
     pad_idx = dataset.tgt_vocab.index("<blank>")
 
     criterion = LabelSmoothing(
@@ -74,7 +81,7 @@ def predict_piece_dashboard(cfg: DictConfig):
     piece = MidiPiece.from_huggingface(one_record_dataset[0])
 
     predicted_piece_df = piece.df.copy()
-    predicted = torch.Tensor([])
+    predicted = torch.Tensor([]).to(dev)
     idx = 0
     for b in tqdm(dataloader):
         idx += 1
@@ -83,7 +90,12 @@ def predict_piece_dashboard(cfg: DictConfig):
         batch = Batch(b[0], b[1], pad=pad_idx)
         batch.to(dev)
         sequence = greedy_decode(
-            model=model, src=batch.src[0], src_mask=batch.src_mask[0], max_len=train_cfg.dataset.sequence_size, start_symbol=0
+            model=model,
+            src=batch.src[0],
+            src_mask=batch.src_mask[0],
+            max_len=train_cfg.dataset.sequence_size,
+            start_symbol=0,
+            device=cfg.device,
         )
         predicted = torch.concat([predicted, sequence[1:]]).type_as(sequence.data)
 
@@ -94,7 +106,7 @@ def predict_piece_dashboard(cfg: DictConfig):
         target = einops.rearrange(batch.tgt_y, "b n -> (b n)")
         loss = criterion(out_rearranged, target) / batch.ntokens
         total_loss += loss.item()
-        total_dist += euclidean_distance(out_rearranged, target)
+        total_dist += euclidean_distance(out_rearranged, target).cpu()
 
     predicted = [dataset.tgt_vocab[x] for x in predicted]
     pred_velocities = dataset.tokenizer_tgt.untokenize(predicted)

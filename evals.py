@@ -162,7 +162,7 @@ def greedy_decode(
     dev = torch.device(device)
     memory = model.encode(src, src_mask)
     # Create a tensor and put start symbol inside
-    sentence = torch.Tensor([[start_symbol]], device=dev).type_as(src.data)
+    sentence = torch.Tensor([[start_symbol]]).type_as(src.data).to(dev)
     for _ in range(max_len):
         sub_mask = subsequent_mask(sentence.size(1)).type_as(src.data).to(device)
         out = model.decode(memory, src_mask, sentence, sub_mask)
@@ -171,7 +171,7 @@ def greedy_decode(
         next_word = prob.argmax(dim=1)
         next_word = next_word.data[0]
 
-        sentence = torch.cat([sentence, torch.Tensor([[next_word]], device=dev).type_as(src.data)], dim=1)
+        sentence = torch.cat([sentence, torch.Tensor([[next_word]]).type_as(src.data).to(dev)], dim=1)
 
     # Don't pretend to be a batch
     return sentence[0]
