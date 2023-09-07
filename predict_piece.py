@@ -1,33 +1,38 @@
-from data.dataset import BinsToVelocityDataset
-from evals import load_checkpoint, load_cached_dataset, greedy_decode
-from utils import piece_av_files
-from datasets import load_dataset
+import glob
+
+import torch
+import einops
+import streamlit as st
 from tqdm import tqdm
-import hydra
+from fortepyan import MidiPiece
 from omegaconf import OmegaConf
+from datasets import load_dataset
+from torch.utils.data import DataLoader
+
 from data.batch import Batch
 from model import make_model
+from data.dataset import BinsToVelocityDataset
 from modules.label_smoothing import LabelSmoothing
-import torch
-from torch.utils.data import DataLoader
-import einops
-from utils import euclidean_distance
-import pandas as pd
-from fortepyan import MidiPiece
-import streamlit as st
+from utils import piece_av_files, euclidean_distance
 
 
-@hydra.main(version_base=None, config_path="config", config_name="render_conf")
 @torch.no_grad()
-def main(cfg):
-    checkpoint = load_checkpoint(cfg.run_name, device=cfg.device)
-    train_cfg = OmegaConf.create(checkpoint['cfg'])
+def predict_piece_dashboard():
+    model_path = st.selectbox(label="model", options=glob.glob("models/*.pt"))
+    device = "cpu"
+    checkpoint = torch.load(model_path, map_location=device)
+    train_cfg = OmegaConf.create(checkpoint["cfg"])
 
-    n_dstart_bins, n_duration_bins, n_velocity_bins = train_cfg.dataset.bins.split(' ')
-    hf_dataset = load_dataset('roszcz/maestro-v1', split='test')
-    for composer, title in zip(hf_dataset['composer'], hf_dataset['title']):
-        print(composer, title)
-    one_record_dataset = hf_dataset.filter(lambda x: x['composer'] == cfg.composer and x['title'] == cfg.title)
+    n_dstart_bins, n_duration_bins, n_velocity_bins = train_cfg.dataset.bins.split(" ")
+    hf_dataset = load_dataset("roszcz/maestro-v1", split="test")
+
+    pieces_names = zip(hf_dataset["composer"], hf_dataset["title"])
+    composer, title = st.selectbox(
+        label="piece",
+        options=[composer + "    " + title for composer, title in pieces_names],
+    ).split("    ")
+
+    one_record_dataset = hf_dataset.filter(lambda x: x["composer"] == composer and x["title"] == title)
     dataset = BinsToVelocityDataset(
         dataset=one_record_dataset,
         n_dstart_bins=eval(n_dstart_bins),
@@ -47,23 +52,21 @@ def main(cfg):
         d_ff=train_cfg.model.d_ff,
         dropout=train_cfg.model.dropout,
     )
-    model.to(cfg.device)
+    model.to(device)
     model.load_state_dict(checkpoint["model_state_dict"])
-    pad_idx = dataset.tgt_vocab.index('<blank>')
+    pad_idx = dataset.tgt_vocab.index("<blank>")
 
     criterion = LabelSmoothing(
         size=output_size,
         padding_idx=pad_idx,
         smoothing=train_cfg.train.label_smoothing,
     )
-    criterion.to(cfg.device)
+    criterion.to(device)
 
-    total_tokens = 0
     total_loss = 0
-    tokens = 0
     total_dist = 0
 
-    dev = torch.device(cfg.device)
+    dev = torch.device(device)
     dataloader = DataLoader(dataset, batch_size=1)
 
     piece = MidiPiece.from_huggingface(one_record_dataset[0])
@@ -85,8 +88,6 @@ def main(cfg):
         target = einops.rearrange(batch.tgt_y, "b n -> (b n)")
         loss = criterion(out_rearranged, target) / batch.ntokens
         total_loss += loss.item()
-        total_tokens += batch.ntokens
-        tokens += batch.ntokens
         total_dist += euclidean_distance(out_rearranged, target)
         predicted = torch.concat([predicted, out_rearranged])
 
@@ -95,17 +96,18 @@ def main(cfg):
     pred_velocities = dataset.tokenizer_tgt.untokenize(predicted)
     predicted_piece_df = predicted_piece_df.head(len(pred_velocities))
 
-    predicted_piece_df['velocity'] = pred_velocities.fillna(0)
+    predicted_piece_df["velocity"] = pred_velocities.fillna(0)
     predicted_piece = MidiPiece(predicted_piece_df)
     predicted_piece.source = piece.source.copy()
-    predicted_piece.source['midi_filename'] = f"documentation/files/{cfg.composer}-{cfg.title}-{cfg.run_name}-pred.midi"
-    piece.source["midi_filename"] = f"documentation/files/{piece.source['midi_filename'].replace('/', '-')}"
+    midi_filename = piece.source["midi_filename"].replace("/", "-")
+    predicted_piece.source["midi_filename"] = f"documentation/files/{midi_filename}-{train_cfg.run_name}-pred.midi"
+    piece.source["midi_filename"] = f"documentation/files/{midi_filename}"
     pred_paths = piece_av_files(predicted_piece)
     paths = piece_av_files(piece)
 
     cols = st.columns(2)
-    avg_loss = total_loss / len(dataset)
-    avg_dist = total_dist / len(dataset)
+    avg_loss = 2 * total_loss / len(dataset)
+    avg_dist = 2 * total_dist / len(dataset)
     predicted_piece.source["average_loss"] = avg_loss
     predicted_piece.source["average_dist"] = avg_dist
     print(f"{avg_loss:6.2f}, {avg_dist:6.2f}")
@@ -120,6 +122,5 @@ def main(cfg):
         st.table(predicted_piece.source)
 
 
-if __name__ == '__main__':
-    main()
-
+if __name__ == "__main__":
+    predict_piece_dashboard()
