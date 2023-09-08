@@ -118,7 +118,7 @@ def model_predictions_review(cfg: DictConfig):
         if not os.path.exists(model_dir):
             os.mkdir(model_dir)
 
-        name = f"{filename.split('.')[0].replave('/', '-')}-{idx + start_index}-"
+        name = f"{filename.split('.')[0].replace('/', '-')}-{idx + start_index}-"
         directory = "tmp/dashboard/"
         pred_piece.source["midi_filename"] = model_dir + "/" + name + ".mid"
 
