@@ -117,9 +117,9 @@ def predict_piece_dashboard(cfg: DictConfig):
     predicted_piece_df["velocity"] = pred_velocities.fillna(0)
     predicted_piece = MidiPiece(predicted_piece_df)
     predicted_piece.source = piece.source.copy()
-    midi_filename = piece.source["midi_filename"].replace("/", "-")
-    predicted_piece.source["midi_filename"] = f"tmp/dashboard/{midi_filename}-{train_cfg.run_name}-pred.midi"
-    piece.source["midi_filename"] = f"tmp/dashboard/common/{midi_filename}"
+    midi_filename = piece.source["midi_filename"].split('.')[0].replace("/", "-")
+    predicted_piece.source["midi_filename"] = f"tmp/dashboard/{train_cfg.run_name}/{midi_filename}-whole_piece.midi"
+    piece.source["midi_filename"] = f"tmp/dashboard/common/{midi_filename}.mid"
     pred_paths = piece_av_files(predicted_piece)
     paths = piece_av_files(piece)
 
