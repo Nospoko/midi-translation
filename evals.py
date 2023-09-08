@@ -30,7 +30,6 @@ def main(cfg):
         cfg.dataset.sequence_size = train_cfg.dataset.sequence_size
         val_data = load_cached_dataset(cfg.dataset, split=cfg.dataset_split)
 
-
     dataloader = DataLoader(val_data, batch_size=train_cfg.train.batch_size)
 
     input_size = len(val_data.src_vocab)
@@ -106,7 +105,7 @@ def make_examples(
     n_examples: int = 5,
     eos_string: str = "</s>",
     random: bool = False,
-    device: str = 'cpu'
+    device: str = "cpu",
 ):
     results = []
     pad_idx = dataset.tgt_vocab.index("<blank>")
@@ -149,12 +148,7 @@ def make_examples(
 
 
 def greedy_decode(
-    model: nn.Module,
-    src: torch.Tensor,
-    src_mask: torch.Tensor,
-    max_len: int,
-    start_symbol: int,
-    device: str = 'cpu'
+    model: nn.Module, src: torch.Tensor, src_mask: torch.Tensor, max_len: int, start_symbol: int, device: str = "cpu"
 ) -> torch.Tensor:
     # Pretend to be batches
     src = src.unsqueeze(0)

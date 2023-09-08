@@ -3,12 +3,13 @@ import glob
 import hydra
 import torch
 import einops
+import pandas as pd
 import streamlit as st
 from tqdm import tqdm
 from fortepyan import MidiPiece
-from omegaconf import OmegaConf, DictConfig
 from datasets import load_dataset
 from torch.utils.data import DataLoader
+from omegaconf import OmegaConf, DictConfig
 
 from data.batch import Batch
 from model import make_model
@@ -23,7 +24,11 @@ def predict_piece_dashboard(cfg: DictConfig):
     model_path = st.selectbox(label="model", options=glob.glob("models/*.pt"))
 
     checkpoint = torch.load(model_path, map_location=cfg.device)
+    params = pd.DataFrame(checkpoint["cfg"]["model"], index=[0])
     train_cfg = OmegaConf.create(checkpoint["cfg"])
+
+    st.table(params)
+
     dev = torch.device(cfg.device)
     n_dstart_bins, n_duration_bins, n_velocity_bins = train_cfg.dataset.bins.split(" ")
     hf_dataset = load_dataset(cfg.dataset.dataset_name, split=cfg.dataset_split)
@@ -36,11 +41,8 @@ def predict_piece_dashboard(cfg: DictConfig):
 
         one_record_dataset = hf_dataset.filter(lambda x: x["composer"] == composer and x["title"] == title)
     else:
-        midi_filename = st.selectbox(
-            label="piece",
-            options=[filename for filename in hf_dataset['midi_filename']]
-        )
-        one_record_dataset = hf_dataset.filter(lambda x: x['midi_filename'] == midi_filename)
+        midi_filename = st.selectbox(label="piece", options=[filename for filename in hf_dataset["midi_filename"]])
+        one_record_dataset = hf_dataset.filter(lambda x: x["midi_filename"] == midi_filename)
 
     dataset = BinsToVelocityDataset(
         dataset=one_record_dataset,

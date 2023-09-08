@@ -1,20 +1,20 @@
 import os
 import glob
 
+import hydra
 import torch
 import numpy as np
 import pandas as pd
 import streamlit as st
 from fortepyan import MidiPiece
+from omegaconf import OmegaConf, DictConfig
 from hydra.core.global_hydra import GlobalHydra
-from omegaconf import OmegaConf
-import hydra
+
 from model import make_model
 from utils import piece_av_files
 from data.dataset import BinsToVelocityDataset
 from predict_piece import predict_piece_dashboard
 from evals import make_examples, load_cached_dataset
-from omegaconf import DictConfig
 
 
 @hydra.main(version_base=None, config_path="config", config_name="dashboard_conf")
@@ -38,6 +38,12 @@ def model_predictions_review(cfg: DictConfig):
     # options
     path = st.selectbox(label="model", options=glob.glob("models/*.pt"))
 
+    # load checkpoint
+    checkpoint = torch.load(path, map_location=cfg.device)
+    params = pd.DataFrame(checkpoint["cfg"]["model"], index=[0])
+    train_cfg = OmegaConf.create(checkpoint["cfg"])
+
+    st.table(params)
     start_index = eval(st.text_input(label="start index", value="0"))
 
     cols = st.columns(4)
@@ -51,9 +57,6 @@ def model_predictions_review(cfg: DictConfig):
     with cols[3]:
         st.markdown("### Predicted")
 
-    # load checkpoint
-    checkpoint = torch.load(path, map_location=cfg.device)
-    train_cfg = OmegaConf.create(checkpoint["cfg"])
     if cfg.dataset.dataset_name is None:
         dataset = load_cached_dataset(train_cfg.dataset)
     else:
@@ -217,13 +220,13 @@ def prepare_midi_pieces(
     # create MidiPieces
     piece = MidiPiece(notes)
     name = f"{filename.split('.')[0].replace('/', '-')}-{idx}-real-{bins}-{dataset.sequence_len}"
-    piece.source["midi_filename"] = "tmp/dashboard/common/" + name + '.mid'
+    piece.source["midi_filename"] = "tmp/dashboard/common/" + name + ".mid"
     # piece.source["title"] = title
     # piece.source["composer"] = composer
 
     quantized_piece = MidiPiece(quantized_notes)
     name = f"{filename.split('.')[0].replace('/', '-')}-{idx}-quantized-{bins}-{dataset.sequence_len}"
-    quantized_piece.source["midi_filename"] = "tmp/dashboard/common/" + name + '.mid'
+    quantized_piece.source["midi_filename"] = "tmp/dashboard/common/" + name + ".mid"
     # quantized_piece.source["title"] = title
     # quantized_piece.source["composer"] = composer
 
