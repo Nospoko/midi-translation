@@ -19,7 +19,8 @@ from evals import make_examples, load_cached_dataset
 
 @hydra.main(version_base=None, config_path="config", config_name="dashboard_conf")
 def main(cfg: DictConfig):
-    mode = st.selectbox(label="Display", options=["Model predictions", "Predict piece", "Tokenization review"])
+    with st.sidebar:
+        mode = st.selectbox(label="Display", options=["Model predictions", "Predict piece", "Tokenization review"])
     if mode == "Tokenization review":
         tokenization_review_dashboard()
     if mode == "Predict piece":
@@ -35,16 +36,17 @@ def get_sample_info(dataset: BinsToVelocityDataset, midi_filename: str):
 
 
 def model_predictions_review(cfg: DictConfig):
-    # options
-    path = st.selectbox(label="model", options=glob.glob("models/*.pt"))
+    with st.sidebar:
+        # options
+        path = st.selectbox(label="model", options=glob.glob("models/*.pt"))
+        start_index = eval(st.text_input(label="start index", value="0"))
 
     # load checkpoint
     checkpoint = torch.load(path, map_location=cfg.device)
     params = pd.DataFrame(checkpoint["cfg"]["model"], index=[0])
     train_cfg = OmegaConf.create(checkpoint["cfg"])
-
+    st.markdown("Model parameters:")
     st.table(params)
-    start_index = eval(st.text_input(label="start index", value="0"))
 
     cols = st.columns(4)
 

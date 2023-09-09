@@ -57,13 +57,13 @@ def main(cfg):
         criterion.to(cfg.device)
 
         print("Evaluating model ...")
-        loss = val_epoch(
+        loss, dist = val_epoch(
             dataloader=dataloader,
             model=model,
             criterion=criterion,
             device=cfg.device,
         )
-        print(f"Model loss:   {loss}")
+        print(f"Model loss:   {loss} | Average distance:    {dist}")
 
     if cfg.tasks.translation:
         print("Checking model outputs ...")

@@ -43,6 +43,12 @@ def euclidean_distance(out: torch.Tensor, tgt: torch.Tensor):
     return torch.dist(labels, tgt.to(float), p=2)
 
 
+def avg_distance(out: torch.Tensor, tgt: torch.Tensor) -> torch.Tensor:
+    labels = out.argmax(1).to(float)
+    # average distance between label and target
+    return torch.dist(labels, tgt.to(float), p=1) / len(labels)
+
+
 def learning_rate_schedule(step: int, model_size: int, factor: float, warmup: int) -> float:
     # we have to default the step to 1 for LambdaLR function
     # to avoid zero raising to negative power.
