@@ -69,10 +69,13 @@ choosing Tokenization review option from "Display" selectbox.
 #### Model predictions review
 When you have trained your model, you can listen to and compare model predictions with original and target pieces.
 Run the same command and choose "Model predictions" option.
+![image](https://github.com/Nospoko/midi-translation/assets/74838859/00b11371-3fa5-4645-b9df-a84ec8045cf5)
 
 
 #### Predict piece
 You can choose a model to predict velocities of any piece from test dataset.
+![image](https://github.com/Nospoko/midi-translation/assets/74838859/5b01b3a9-f5c4-4eaa-a623-d089cf64e587)
+
 
 ### Eval
 You can evaluate your model and see the loss on the test dataset. For example if you have a model weights file called
