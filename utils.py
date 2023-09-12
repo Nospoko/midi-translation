@@ -10,8 +10,9 @@ from fortepyan import MidiPiece
 from datasets import load_dataset
 from omegaconf import OmegaConf, DictConfig
 from fortepyan.audio import render as render_audio
-
+import torch.nn as nn
 from data.dataset import BinsToVelocityDataset
+from modules.encoderdecoder import subsequent_mask
 
 
 def piece_av_files(piece: MidiPiece) -> dict:
@@ -87,3 +88,52 @@ def load_cached_dataset(cfg: DictConfig, split="test") -> BinsToVelocityDataset:
         pickle.dump(dataset, file)
     file.close()
     return dataset
+
+
+def process_record(record, dataset: BinsToVelocityDataset, model, cfg, train_cfg):
+    pad_idx = dataset.tgt_vocab.index("<blank>")
+    src_mask = (record[0] != pad_idx).unsqueeze(-2)
+    sequence = greedy_decode(
+        model=model,
+        src=record[0],
+        src_mask=src_mask,
+        max_len=train_cfg.dataset.sequence_size,
+        start_symbol=0,
+        device=cfg.device,
+    )
+
+    src_tokens = [dataset.src_vocab[x] for x in record[0] if x != pad_idx]
+    tgt_tokens = [dataset.tgt_vocab[x] for x in record[1] if x != pad_idx]
+    out_tokens = [dataset.tgt_vocab[x] for x in sequence if x != pad_idx]
+
+    result = {
+        "src": src_tokens,
+        "tgt": tgt_tokens,
+        "out": out_tokens,
+    }
+
+    return result
+
+
+def greedy_decode(
+    model: nn.Module, src: torch.Tensor, src_mask: torch.Tensor, max_len: int, start_symbol: int, device: str = "cpu"
+) -> torch.Tensor:
+    # Pretend to be batches
+    src = src.unsqueeze(0)
+    src_mask = src_mask.unsqueeze(0)
+    dev = torch.device(device)
+    memory = model.encode(src, src_mask)
+    # Create a tensor and put start symbol inside
+    sentence = torch.Tensor([[start_symbol]]).type_as(src.data).to(dev)
+    for _ in range(max_len):
+        sub_mask = subsequent_mask(sentence.size(1)).type_as(src.data).to(device)
+        out = model.decode(memory, src_mask, sentence, sub_mask)
+
+        prob = model.generator(out[:, -1])
+        next_word = prob.argmax(dim=1)
+        next_word = next_word.data[0]
+
+        sentence = torch.cat([sentence, torch.Tensor([[next_word]]).type_as(src.data).to(dev)], dim=1)
+
+    # Don't pretend to be a batch
+    return sentence[0]

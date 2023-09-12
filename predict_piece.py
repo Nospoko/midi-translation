@@ -13,9 +13,8 @@ from omegaconf import OmegaConf, DictConfig
 
 from data.batch import Batch
 from model import make_model
-from evals import greedy_decode
 from data.dataset import BinsToVelocityDataset
-from utils import avg_distance, piece_av_files
+from utils import avg_distance, piece_av_files, greedy_decode
 from modules.label_smoothing import LabelSmoothing
 
 

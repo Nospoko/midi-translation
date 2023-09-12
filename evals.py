@@ -46,39 +46,23 @@ def main(cfg):
     model.to(cfg.device)
     model.load_state_dict(checkpoint["model_state_dict"])
 
-    if cfg.tasks.val_epoch:
-        pad_idx = val_data.tgt_vocab.index("<blank>")
+    pad_idx = val_data.tgt_vocab.index("<blank>")
 
-        criterion = LabelSmoothing(
-            size=output_size,
-            padding_idx=pad_idx,
-            smoothing=train_cfg.train.label_smoothing,
-        )
-        criterion.to(cfg.device)
+    criterion = LabelSmoothing(
+        size=output_size,
+        padding_idx=pad_idx,
+        smoothing=train_cfg.train.label_smoothing,
+    )
+    criterion.to(cfg.device)
 
-        print("Evaluating model ...")
-        loss, dist = val_epoch(
-            dataloader=dataloader,
-            model=model,
-            criterion=criterion,
-            device=cfg.device,
-        )
-        print(f"Model loss:   {loss} | Average distance:    {dist}")
-
-    if cfg.tasks.translation:
-        print("Checking model outputs ...")
-        translations = make_examples(
-            dataset=val_data,
-            model=model,
-            n_examples=cfg.n_examples,
-            random=cfg.random,
-            device=cfg.device,
-        )
-
-        for translation in translations:
-            print("Source (Input)        : " + " ".join(translation["src"]))
-            print("Target (Ground Truth) : " + " ".join(translation["tgt"]))
-            print("Model Output               : " + " ".join(translation["out"]))
+    print("Evaluating model ...")
+    loss, dist = val_epoch(
+        dataloader=dataloader,
+        model=model,
+        criterion=criterion,
+        device=cfg.device,
+    )
+    print(f"Model loss:   {loss} | Average distance:    {dist}")
 
 
 def load_checkpoint(run_name: str, epoch: str = "final", device: str = "cpu"):
@@ -96,79 +80,6 @@ def load_checkpoint(run_name: str, epoch: str = "final", device: str = "cpu"):
     path = "models/" + path
     checkpoint = torch.load(path, map_location=device)
     return checkpoint
-
-
-def make_examples(
-    dataset: BinsToVelocityDataset,
-    model: nn.Module,
-    start_index: int = 0,
-    n_examples: int = 5,
-    eos_string: str = "</s>",
-    random: bool = False,
-    device: str = "cpu",
-):
-    results = []
-    pad_idx = dataset.tgt_vocab.index("<blank>")
-    dataloader = DataLoader(dataset, shuffle=random)
-    idx = -1
-    for b in dataloader:
-        batch = Batch(b[0], b[1], pad_idx)
-        for it in range(len(batch)):
-            idx += 1
-            # I want to be able to get samples from any index from the database,
-            # I also want to use examples without overlap
-            if idx < start_index or idx % 2 == 1:
-                continue
-
-            record = batch[it]
-            src_tokens = [dataset.src_vocab[x] for x in record.src if x != pad_idx]
-            tgt_tokens = [dataset.tgt_vocab[x] for x in record.tgt if x != pad_idx]
-
-            decoded_record = greedy_decode(
-                model=model,
-                src=record.src,
-                src_mask=record.src_mask,
-                max_len=dataset.sequence_len,
-                start_symbol=0,
-                device=device,
-            )
-
-            model_txt = [dataset.tgt_vocab[x] for x in decoded_record if x != pad_idx]
-            result = {
-                "src": src_tokens,
-                "tgt": tgt_tokens,
-                "out": model_txt,
-            }
-            results.append(result)
-
-            if len(results) == n_examples:
-                return results
-
-    return results
-
-
-def greedy_decode(
-    model: nn.Module, src: torch.Tensor, src_mask: torch.Tensor, max_len: int, start_symbol: int, device: str = "cpu"
-) -> torch.Tensor:
-    # Pretend to be batches
-    src = src.unsqueeze(0)
-    src_mask = src_mask.unsqueeze(0)
-    dev = torch.device(device)
-    memory = model.encode(src, src_mask)
-    # Create a tensor and put start symbol inside
-    sentence = torch.Tensor([[start_symbol]]).type_as(src.data).to(dev)
-    for _ in range(max_len):
-        sub_mask = subsequent_mask(sentence.size(1)).type_as(src.data).to(device)
-        out = model.decode(memory, src_mask, sentence, sub_mask)
-
-        prob = model.generator(out[:, -1])
-        next_word = prob.argmax(dim=1)
-        next_word = next_word.data[0]
-
-        sentence = torch.cat([sentence, torch.Tensor([[next_word]]).type_as(src.data).to(dev)], dim=1)
-
-    # Don't pretend to be a batch
-    return sentence[0]
 
 
 if __name__ == "__main__":
