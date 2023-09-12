@@ -106,13 +106,7 @@ def process_record(record, dataset: BinsToVelocityDataset, model, cfg, train_cfg
     tgt_tokens = [dataset.tgt_vocab[x] for x in record[1] if x != pad_idx]
     out_tokens = [dataset.tgt_vocab[x] for x in sequence if x != pad_idx]
 
-    result = {
-        "src": src_tokens,
-        "tgt": tgt_tokens,
-        "out": out_tokens,
-    }
-
-    return result
+    return out_tokens
 
 
 def greedy_decode(

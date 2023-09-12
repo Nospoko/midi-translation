@@ -83,6 +83,7 @@ def model_predictions_review(cfg: DictConfig):
     records = [dataset.records[idx] for idx in idxs]
     samples = [dataset[idx] for idx in idxs]
 
+    pad_idx = dataset.tgt_vocab.index("<blank>")
     bins = train_cfg.dataset.bins.replace(" ", "-")
 
     # predict velocities and get src, tgt and model output
@@ -95,8 +96,9 @@ def model_predictions_review(cfg: DictConfig):
             cfg=cfg,
             train_cfg=train_cfg,
         )
-        src = result["src"]
-        out = result["out"]
+        src = [dataset.src_vocab[x] for x in sample[0] if x != pad_idx]
+        # tgt = [dataset.tgt_vocab[x] for x in sample[1] if x != pad_idx]
+        out = result
         record["source"] = json.loads(record["source"])
 
         source = dataset.tokenizer_src.untokenize(src)
