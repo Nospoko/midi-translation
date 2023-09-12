@@ -1,3 +1,4 @@
+import json
 import os
 import glob
 
@@ -92,7 +93,7 @@ def model_predictions_review(cfg: DictConfig):
 
         # get unprocessed data
         record = dataset.records[idx + start_index]
-
+        record["source"] = json.loads(record["source"])
         # get untokenized source data
         source = dataset.tokenizer_src.untokenize(src)
         predicted = dataset.tokenizer_tgt.untokenize(out)
@@ -123,11 +124,14 @@ def model_predictions_review(cfg: DictConfig):
         if not os.path.exists(model_dir):
             os.mkdir(model_dir)
 
-        name = f"{filename.split('.')[0].replace('/', '-')}-{idx + start_index}-"
         directory = "tmp/dashboard/"
+
+        name = f"{filename.split('.')[0].replace('/', '-')}-{idx + start_index}"
+        pred_piece.source = true_piece.source.copy()
         pred_piece.source["midi_filename"] = model_dir + "/" + name + ".mid"
 
-        name = f"{filename.split('.')[0].replace('/', '-')}-{idx + start_index}-qv-{bins}-{dataset.sequence_len}-"
+        name = f"{filename.split('.')[0].replace('/', '-')}-{idx + start_index}-qv-{bins}-{dataset.sequence_len}"
+        quantized_vel_piece.source = true_piece.source.copy()
         quantized_vel_piece.source["midi_filename"] = directory + "common/" + name + ".mid"
 
         print("Creating files ...")
@@ -202,7 +206,7 @@ def prepare_midi_pieces(
 ) -> tuple[MidiPiece, MidiPiece]:
     # get dataframes with notes
     processed_df = pd.DataFrame(processed)
-
+    piece_source = record.pop("source")
     notes = pd.DataFrame(record)
     quantized_notes = dataset.quantizer.apply_quantization(processed_df)
     # we have to pop midi_filename column
@@ -222,13 +226,15 @@ def prepare_midi_pieces(
     # create MidiPieces
     piece = MidiPiece(notes)
     name = f"{filename.split('.')[0].replace('/', '-')}-{idx}-real-{bins}-{dataset.sequence_len}"
-    piece.source["midi_filename"] = "tmp/dashboard/common/" + name + ".mid"
+    piece.source = piece_source
+    piece.source["midi_filename"] = f"tmp/dashboard/common/{name}.mid"
     # piece.source["title"] = title
     # piece.source["composer"] = composer
 
     quantized_piece = MidiPiece(quantized_notes)
     name = f"{filename.split('.')[0].replace('/', '-')}-{idx}-quantized-{bins}-{dataset.sequence_len}"
-    quantized_piece.source["midi_filename"] = "tmp/dashboard/common/" + name + ".mid"
+    quantized_piece.source = piece.source.copy()
+    quantized_piece.source["midi_filename"] = f"tmp/dashboard/common/{name}.mid"
     # quantized_piece.source["title"] = title
     # quantized_piece.source["composer"] = composer
 

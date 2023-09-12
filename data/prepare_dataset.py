@@ -2,7 +2,7 @@
 prepare_dataset.py by Jasiek Kaczmarczyk
 from https://github.com/Nospoko/midi-clip/blob/MIDI-44/midi-clip/data/prepare_dataset.py
 """
-
+import json
 import os
 
 import fortepyan as ff
@@ -75,6 +75,7 @@ def process_record(piece: ff.MidiPiece, sequence_len: int, quantizer: MidiQuanti
             "end": subset.end.values,
             "duration": subset.duration.values,
             "velocity": subset.velocity.values,
+            "source": json.dumps(piece.source),
         }
 
         record.append(sequence)
