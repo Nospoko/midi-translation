@@ -20,21 +20,37 @@ class Tokenizer:
         samples.append("</s>")
         return samples
 
-    def untokenize(self, tokens: list[str]) -> dict:
+    def untokenize(self, tokens: list[str]) -> pd.DataFrame:
         sample = pd.DataFrame(columns=self.keys)
 
         for token in tokens:
             if token in self.specials:
                 continue
-            values = token.split("-")
-            sample = pd.concat([sample, pd.DataFrame([values], columns=self.keys)], axis="rows")
+
+            values_txt = token.split("-")
+            values = [eval(txt) for txt in values_txt]
+
+            sample = pd.concat(
+                [sample, pd.DataFrame([values], columns=self.keys)],
+                axis="rows",
+                ignore_index=True,
+            )
 
         # I return dict so that untokenize output is the same type as tokenize input
-        return sample.to_dict()
+        return sample
 
 
 class VelocityTokenizer(Tokenizer):
     def __init__(self):
         super().__init__(keys=["velocity"])
 
-    untokenize = property(doc="(!) you cannot untokenize velocity tokens")
+    def untokenize(self, tokens: list[str]) -> pd.DataFrame:
+        values = []
+        for token in tokens:
+            if token in self.specials:
+                continue
+            value = eval(token)
+            values.append(value)
+        sample = pd.DataFrame(values, columns=["velocity"])
+
+        return sample

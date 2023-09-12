@@ -3,3 +3,7 @@
 dataset*.pt
 tmp/*
 *.pt
+outputs/*
+wandb/*
+models/*
+documentation/files
