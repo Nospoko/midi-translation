@@ -6,9 +6,9 @@ import fortepyan as ff
 from tqdm import tqdm
 from datasets import Dataset
 
-from data.quantizer import MidiQuantizer
 from data.prepare_dataset import process_record
 from data.tokenizer import Tokenizer, VelocityTokenizer
+from data.quantizer import MidiQuantizer, QuantizerWithDstart
 
 
 class TokenizedMidiDataset:
@@ -34,9 +34,9 @@ class TokenizedMidiDataset:
             n_velocity_bins=n_velocity_bins,
         )
 
+        self.records = self._build_dataset()
         self.src_vocab, self.tgt_vocab = self.build_vocab()
 
-        self.records = self._build_dataset()
         self.samples = self.load_samples()
 
     def load_samples(self) -> list[tuple[torch.Tensor, torch.Tensor]]:
@@ -76,14 +76,13 @@ class TokenizedMidiDataset:
     def build_vocab(self) -> tuple[list[str], list[str]]:
         vocab_src, vocab_tgt = ["<s>", "<blank>", "</s>"], ["<s>", "<blank>", "</s>"]
         iterators = {
-            "pitch": range(21, 109),
-            "duration_bin": range(self.quantizer.n_duration_bins),
-            "dstart_bin": range(self.quantizer.n_dstart_bins),
-            "velocity_bin": range(self.quantizer.n_velocity_bins),
+            "pitch": [str(pitch) for pitch in range(21, 109)],
+            "duration_bin": [str(dur) for dur in range(self.quantizer.n_duration_bins)],
+            "dstart_bin": [str(ds) for ds in range(self.quantizer.n_dstart_bins)],
+            "velocity_bin": [str(v) for v in range(self.quantizer.n_velocity_bins)],
         }
 
         src_product = itertools.product((iterators[key] for key in self.tokenizer_src.keys))
-
         tgt_product = itertools.product((iterators[key] for key in self.tokenizer_tgt.keys))
 
         for values in src_product:
@@ -100,6 +99,74 @@ class TokenizedMidiDataset:
 
     def __len__(self):
         return len(self.samples)
+
+
+class BinsToDstartDataset(TokenizedMidiDataset):
+    def __init__(
+        self,
+        dataset: Dataset,
+        n_dstart_bins: int = 3,
+        n_duration_bins: int = 3,
+        n_velocity_bins: int = 3,
+        n_tgt_dstart_bins: int = 100,
+        sequence_len: int = 128,
+    ):
+        self.n_tgt_dstart_bins = n_tgt_dstart_bins
+        tokenizer_src = Tokenizer(keys=["pitch", "dstart_bin", "duration_bin", "velocity_bin"])
+        tokenizer_tgt = Tokenizer(keys=["tgt_dstart_bin"])
+        super().__init__(
+            src_tokenizer=tokenizer_src,
+            tgt_tokenizer=tokenizer_tgt,
+            dataset=dataset,
+            n_dstart_bins=n_dstart_bins,
+            n_duration_bins=n_duration_bins,
+            n_velocity_bins=n_velocity_bins,
+            sequence_len=sequence_len,
+        )
+
+    def _build_dataset(self) -> list[dict]:
+        processed_records = []
+
+        print("Building a dataset ...")
+        for record in tqdm(self.dataset, total=self.dataset.num_rows):
+            # print(record)
+            piece = ff.MidiPiece.from_huggingface(record)
+
+            # quantizer attribute override
+            self.quantizer = QuantizerWithDstart(
+                n_dstart_bins=self.quantizer.n_dstart_bins,
+                n_duration_bins=self.quantizer.n_duration_bins,
+                n_velocity_bins=self.quantizer.n_velocity_bins,
+                n_tgt_dstart_bins=self.n_tgt_dstart_bins,
+            )
+
+            processed_record = process_record(piece, self.sequence_len, self.quantizer)
+
+            processed_records += processed_record
+
+        return processed_records
+
+    def build_vocab(self) -> tuple[list[str], list[str]]:
+        vocab_src, vocab_tgt = ["<s>", "<blank>", "</s>"], ["<s>", "<blank>", "</s>"]
+        iterators = {
+            "pitch": [str(pitch) for pitch in range(21, 109)],
+            "duration_bin": [str(dur) for dur in range(self.quantizer.n_duration_bins)],
+            "dstart_bin": [str(ds) for ds in range(self.quantizer.n_dstart_bins)],
+            "velocity_bin": [str(v) for v in range(self.quantizer.n_velocity_bins)],
+            "tgt_dstart_bin": [str(tgt) for tgt in range(self.quantizer.n_tgt_dstart_bins)],
+        }
+
+        src_product = itertools.product(*[iterators[key] for key in self.tokenizer_src.keys])
+        tgt_product = itertools.product(*[iterators[key] for key in self.tokenizer_tgt.keys])
+
+        for values in src_product:
+            key = "-".join(values)
+            vocab_src.append(key)
+        for values in tgt_product:
+            key = "-".join(values)
+            vocab_tgt.append(key)
+
+        return vocab_src, vocab_tgt
 
 
 class BinsToVelocityDataset(TokenizedMidiDataset):
@@ -145,19 +212,17 @@ class BinsToVelocityDataset(TokenizedMidiDataset):
 
         return vocab_src, vocab_tgt
 
+
 def main():
-    src_tokenizer = Tokenizer(keys=["pitch", "dstart_bin"])
-    tgt_tokenizer = Tokenizer(keys=["duration_bin", "velocity_bin"])
     from datasets import load_dataset
 
     hf_dataset = load_dataset("roszcz/maestro-v1", split="validation")
-    dataset = TokenizedMidiDataset(
-        src_tokenizer=src_tokenizer,
-        tgt_tokenizer=tgt_tokenizer,
+    dataset = BinsToDstartDataset(
         dataset=hf_dataset,
         n_dstart_bins=5,
         n_duration_bins=3,
         n_velocity_bins=3,
+        n_tgt_dstart_bins=10,
     )
 
     processed_record = dataset.records[0]

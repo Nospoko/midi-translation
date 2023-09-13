@@ -77,9 +77,10 @@ def process_record(piece: ff.MidiPiece, sequence_len: int, quantizer: MidiQuanti
             "velocity": subset.velocity.values,
             "source": json.dumps(piece.source),
         }
+        if "tgt_dstart_bin" in piece_quantized.df.keys():
+            sequence |= {"tgt_dstart_bin": quantized.tgt_dstart_bin.astype("int16").values.T}
 
         record.append(sequence)
-
     return record
 
 

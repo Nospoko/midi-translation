@@ -113,3 +113,41 @@ class MidiQuantizer:
                         vocab.append(key)
 
         return vocab
+
+
+class QuantizerWithDstart(MidiQuantizer):
+    def __init__(
+        self,
+        n_dstart_bins: int = 3,
+        n_duration_bins: int = 3,
+        n_velocity_bins: int = 3,
+        n_tgt_dstart_bins: int = 100,
+    ):
+        self.n_tgt_dstart_bins = n_tgt_dstart_bins
+        super().__init__(
+            n_dstart_bins=n_dstart_bins,
+            n_duration_bins=n_duration_bins,
+            n_velocity_bins=n_velocity_bins,
+        )
+
+    def _load_bin_edges(self):
+        # Hydra changes paths, this finds it back
+        artifacts_path = to_absolute_path("artifacts/bin_edges.yaml")
+        with open(artifacts_path, "r") as f:
+            bin_edges = yaml.safe_load(f)
+
+        self.dstart_bin_edges = bin_edges["dstart"][self.n_dstart_bins]
+        self.duration_bin_edges = bin_edges["duration"][self.n_duration_bins]
+        self.velocity_bin_edges = bin_edges["velocity"][self.n_velocity_bins]
+        self.tgt_dstart_bin_edges = bin_edges["dstart"][self.n_tgt_dstart_bins]
+
+    def quantize_frame(self, df: pd.DataFrame) -> pd.DataFrame:
+        df["next_start"] = df.start.shift(-1)
+        df["dstart"] = df.next_start - df.start
+        df["tgt_dstart_bin"] = np.digitize(df.dstart.fillna(0), self.tgt_dstart_bin_edges) - 1
+        df["dstart_bin"] = np.digitize(df.dstart.fillna(0), self.dstart_bin_edges) - 1
+        df["duration_bin"] = np.digitize(df.duration, self.duration_bin_edges) - 1
+        df["velocity_bin"] = np.digitize(df.velocity, self.velocity_bin_edges) - 1
+
+        df = self.apply_quantization(df)
+        return df
