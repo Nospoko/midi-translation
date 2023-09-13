@@ -145,6 +145,7 @@ class BinsToVelocityDataset(TokenizedMidiDataset):
 
         return vocab_src, vocab_tgt
 
+
 def main():
     src_tokenizer = Tokenizer(keys=["pitch", "dstart_bin"])
     tgt_tokenizer = Tokenizer(keys=["duration_bin", "velocity_bin"])

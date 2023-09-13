@@ -88,14 +88,13 @@ def load_cached_dataset(cfg: DictConfig, split="test") -> BinsToVelocityDataset:
             )
             pickle.dump(dataset, file)
         file.close()
-    except EOFError:
+    except (EOFError, UnboundLocalError):
         file.close()
         os.remove(path=dataset_cache_path)
-        raise EOFError
     return dataset
 
 
-def process_record(record, dataset: BinsToVelocityDataset, model, cfg, train_cfg):
+def predict_sample(record, dataset: BinsToVelocityDataset, model, cfg, train_cfg) -> list[str]:
     pad_idx = dataset.tgt_vocab.index("<blank>")
     src_mask = (record[0] != pad_idx).unsqueeze(-2)
 

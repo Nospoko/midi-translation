@@ -1,6 +1,6 @@
-import json
 import os
 import glob
+import json
 
 import hydra
 import torch
@@ -12,10 +12,10 @@ from omegaconf import OmegaConf, DictConfig
 from hydra.core.global_hydra import GlobalHydra
 
 from model import make_model
-from utils import piece_av_files, process_record
 from data.dataset import BinsToVelocityDataset
+from evals.evaluate import load_cached_dataset
+from utils import piece_av_files, predict_sample
 from predict_piece import predict_piece_dashboard
-from evals import load_cached_dataset
 
 
 @hydra.main(version_base=None, config_path="config", config_name="dashboard_conf")
@@ -90,7 +90,7 @@ def model_predictions_review(cfg: DictConfig):
     # predict velocities and get src, tgt and model output
     print("Making predictions ...")
     for record, sample, idx in zip(records, samples, idxs):
-        result = process_record(
+        result = predict_sample(
             record=sample,
             dataset=dataset,
             model=model,

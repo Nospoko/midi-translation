@@ -85,6 +85,7 @@ def predict_piece_dashboard(cfg: DictConfig):
     dataloader = DataLoader(dataset, batch_size=1)
 
     piece = MidiPiece.from_huggingface(one_record_dataset[0])
+
     piece.source["midi_filename"] = midi_filename
 
     predicted_piece_df = piece.df.copy()

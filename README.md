@@ -84,5 +84,5 @@ You can evaluate your model and see the loss on the test dataset. For example if
 ```
 You can run:
 ```shell
-python evals.py run_name="2023-08-31-14-38" dataset.dataset_name="roszcz/maestro-v1-sustain"
+python evaluate.py run_name="2023-08-31-14-38" dataset.dataset_name="roszcz/maestro-v1-sustain"
 ```

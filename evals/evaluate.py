@@ -11,7 +11,7 @@ from utils import load_cached_dataset
 from modules.label_smoothing import LabelSmoothing
 
 
-@hydra.main(version_base=None, config_path="config", config_name="eval_conf")
+@hydra.main(version_base=None, config_path="../config", config_name="eval_conf")
 def main(cfg):
     checkpoint = load_checkpoint(
         run_name=cfg.run_name,
