@@ -2,16 +2,12 @@ import os
 
 import hydra
 import torch
-import torch.nn as nn
 from omegaconf import OmegaConf
 from torch.utils.data import DataLoader
 
 from train import val_epoch
-from data.batch import Batch
 from model import make_model
 from utils import load_cached_dataset
-from data.dataset import BinsToVelocityDataset
-from modules.encoderdecoder import subsequent_mask
 from modules.label_smoothing import LabelSmoothing
 
 
@@ -69,7 +65,7 @@ def load_checkpoint(run_name: str, epoch: str = "final", device: str = "cpu"):
     # find path with desired run
     path = None
     for file in os.listdir("models"):
-        if file.find(f"{run_name}-{epoch}") > 0:
+        if f"{run_name}" in file:
             path = file
             break
 

@@ -76,6 +76,7 @@ def model_predictions_review(cfg: DictConfig):
         dropout=train_cfg.model.dropout,
     )
     model.load_state_dict(checkpoint["model_state_dict"])
+    model.to(cfg.device)
 
     n_samples = 5
     idxs = np.random.randint(len(dataset), size=n_samples)
@@ -173,6 +174,7 @@ def tokenization_review_dashboard():
 
     dataset = load_cached_dataset(dataset_cfg)
     bins = bins.replace(" ", "-")
+
     n_samples = 5
     cols = st.columns(2)
     with cols[0]:
@@ -229,7 +231,7 @@ def prepare_midi_pieces(
     # create MidiPieces
     piece = MidiPiece(notes)
     name = f"{filename.split('.')[0].replace('/', '-')}-{idx}-real-{bins}-{dataset.sequence_len}"
-    piece.source = piece_source
+    piece.source = json.loads(piece_source)
     piece.source["midi_filename"] = f"tmp/dashboard/common/{name}.mid"
     # piece.source["title"] = title
     # piece.source["composer"] = composer

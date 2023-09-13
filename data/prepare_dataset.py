@@ -2,8 +2,8 @@
 prepare_dataset.py by Jasiek Kaczmarczyk
 from https://github.com/Nospoko/midi-clip/blob/MIDI-44/midi-clip/data/prepare_dataset.py
 """
-import json
 import os
+import json
 
 import fortepyan as ff
 from tqdm import tqdm

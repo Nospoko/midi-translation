@@ -14,8 +14,8 @@ from omegaconf import OmegaConf, DictConfig
 from data.batch import Batch
 from model import make_model
 from data.dataset import BinsToVelocityDataset
-from utils import avg_distance, piece_av_files, greedy_decode
 from modules.label_smoothing import LabelSmoothing
+from utils import avg_distance, greedy_decode, piece_av_files
 
 
 @torch.no_grad()

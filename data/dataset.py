@@ -160,7 +160,6 @@ class BinsToVelocityDataset(TokenizedMidiDataset):
         for processed_record in pbar:
             src_tokens = self.tokenizer_src(processed_record)
             tgt_tokens = self.tokenizer_tgt(processed_record)
-
             src_processed = [self.src_vocab.index(token) for token in src_tokens]
             tgt_processed = [self.tgt_vocab.index(token) for token in tgt_tokens]
 

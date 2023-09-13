@@ -4,13 +4,14 @@ import pickle
 import hashlib
 
 import torch
+import torch.nn as nn
 import fortepyan as ff
 import matplotlib.pyplot as plt
 from fortepyan import MidiPiece
 from datasets import load_dataset
 from omegaconf import OmegaConf, DictConfig
 from fortepyan.audio import render as render_audio
-import torch.nn as nn
+
 from data.dataset import BinsToVelocityDataset
 from modules.encoderdecoder import subsequent_mask
 
@@ -68,31 +69,36 @@ def load_cached_dataset(cfg: DictConfig, split="test") -> BinsToVelocityDataset:
     config_hash = config_hash.hexdigest()
     cache_dir = "tmp/datasets"
     print(f"Preparing dataset: {config_hash}")
+    try:
+        dataset_cache_file = f"{config_hash}.pkl"
+        dataset_cache_path = os.path.join(cache_dir, dataset_cache_file)
 
-    dataset_cache_file = f"{config_hash}.pkl"
-    dataset_cache_path = os.path.join(cache_dir, dataset_cache_file)
-
-    if os.path.exists(dataset_cache_path):
-        file = open(dataset_cache_path, "rb")
-        dataset = pickle.load(file)
-    else:
-        file = open(dataset_cache_path, "wb")
-        hf_dataset = load_dataset(cfg.dataset_name, split=split)
-        dataset = BinsToVelocityDataset(
-            dataset=hf_dataset,
-            n_dstart_bins=n_dstart_bins,
-            n_velocity_bins=n_velocity_bins,
-            n_duration_bins=n_duration_bins,
-            sequence_len=cfg.sequence_size,
-        )
-        pickle.dump(dataset, file)
-    file.close()
+        if os.path.exists(dataset_cache_path):
+            file = open(dataset_cache_path, "rb")
+            dataset = pickle.load(file)
+        else:
+            file = open(dataset_cache_path, "wb")
+            hf_dataset = load_dataset(cfg.dataset_name, split=split)
+            dataset = BinsToVelocityDataset(
+                dataset=hf_dataset,
+                n_dstart_bins=n_dstart_bins,
+                n_velocity_bins=n_velocity_bins,
+                n_duration_bins=n_duration_bins,
+                sequence_len=cfg.sequence_size,
+            )
+            pickle.dump(dataset, file)
+        file.close()
+    except EOFError:
+        file.close()
+        os.remove(path=dataset_cache_path)
+        raise EOFError
     return dataset
 
 
 def process_record(record, dataset: BinsToVelocityDataset, model, cfg, train_cfg):
     pad_idx = dataset.tgt_vocab.index("<blank>")
     src_mask = (record[0] != pad_idx).unsqueeze(-2)
+
     sequence = greedy_decode(
         model=model,
         src=record[0],
@@ -102,8 +108,6 @@ def process_record(record, dataset: BinsToVelocityDataset, model, cfg, train_cfg
         device=cfg.device,
     )
 
-    src_tokens = [dataset.src_vocab[x] for x in record[0] if x != pad_idx]
-    tgt_tokens = [dataset.tgt_vocab[x] for x in record[1] if x != pad_idx]
     out_tokens = [dataset.tgt_vocab[x] for x in sequence if x != pad_idx]
 
     return out_tokens
@@ -112,15 +116,16 @@ def process_record(record, dataset: BinsToVelocityDataset, model, cfg, train_cfg
 def greedy_decode(
     model: nn.Module, src: torch.Tensor, src_mask: torch.Tensor, max_len: int, start_symbol: int, device: str = "cpu"
 ) -> torch.Tensor:
-    # Pretend to be batches
-    src = src.unsqueeze(0)
-    src_mask = src_mask.unsqueeze(0)
     dev = torch.device(device)
+    # Pretend to be batches
+    src = src.unsqueeze(0).to(dev)
+    src_mask = src_mask.unsqueeze(0).to(dev)
+
     memory = model.encode(src, src_mask)
     # Create a tensor and put start symbol inside
     sentence = torch.Tensor([[start_symbol]]).type_as(src.data).to(dev)
     for _ in range(max_len):
-        sub_mask = subsequent_mask(sentence.size(1)).type_as(src.data).to(device)
+        sub_mask = subsequent_mask(sentence.size(1)).type_as(src.data).to(dev)
         out = model.decode(memory, src_mask, sentence, sub_mask)
 
         prob = model.generator(out[:, -1])
