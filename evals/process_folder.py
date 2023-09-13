@@ -1,4 +1,5 @@
 import glob
+import os
 
 from tqdm import tqdm
 
@@ -18,7 +19,7 @@ def main(cfg: DictConfig):
     dev = torch.device(cfg.device)
     checkpoint = load_checkpoint(run_name=cfg.run_name, device=cfg.device)
     train_cfg = OmegaConf.create(checkpoint["cfg"])
-
+    os.mkdir(cfg.output_dir)
     n_dstart_bins, n_duration_bins, n_velocity_bins = train_cfg.dataset.bins.split(" ")
     input_size = checkpoint["input_size"]
     output_size = checkpoint["output_size"]
@@ -65,7 +66,7 @@ def main(cfg: DictConfig):
 
         pred_piece = ff.MidiPiece(pred_df)
         pred_piece.source = piece.source.copy()
-        pred_path = file.split('.')[0] + "-pred.mid"
+        pred_path = cfg.output_dir + os.path.basename(file).split('.')[0] + "-pred.mid"
         pred_piece.to_midi().write(pred_path)
 
 

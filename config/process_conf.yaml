@@ -1,3 +1,4 @@
 run_name: "22-57"
 target_folder: "midi_files"
 device: "cpu"
+output_dir: "predicted_midi"
