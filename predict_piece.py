@@ -19,26 +19,27 @@ from utils import piece_av_files, euclidean_distance
 
 @torch.no_grad()
 def predict_piece_dashboard():
-    model_path = st.selectbox(label="model", options=glob.glob("models/*.pt"))
     device = "cpu"
-    checkpoint = torch.load(model_path, map_location=device)
-    train_cfg = OmegaConf.create(checkpoint["cfg"])
+    checkpoint_path = st.selectbox(label="model", options=glob.glob("models/*.pt"))
+    checkpoint = torch.load(checkpoint_path, map_location=device)
 
+    train_cfg = OmegaConf.create(checkpoint["cfg"])
     n_dstart_bins, n_duration_bins, n_velocity_bins = train_cfg.dataset.bins.split(" ")
-    hf_dataset = load_dataset("roszcz/maestro-v1", split="test")
+    hf_dataset = load_dataset("roszcz/maestro-v1-sustain", split="test")
 
     pieces_names = zip(hf_dataset["composer"], hf_dataset["title"])
+    pieces_names = [composer + "    " + title for composer, title in pieces_names]
     composer, title = st.selectbox(
         label="piece",
-        options=[composer + "    " + title for composer, title in pieces_names],
+        options=pieces_names,
     ).split("    ")
 
     one_record_dataset = hf_dataset.filter(lambda x: x["composer"] == composer and x["title"] == title)
     dataset = BinsToVelocityDataset(
         dataset=one_record_dataset,
-        n_dstart_bins=eval(n_dstart_bins),
-        n_duration_bins=eval(n_duration_bins),
-        n_velocity_bins=eval(n_velocity_bins),
+        n_dstart_bins=int(n_dstart_bins),
+        n_duration_bins=int(n_duration_bins),
+        n_velocity_bins=int(n_velocity_bins),
         sequence_len=train_cfg.dataset.sequence_size,
     )
 
@@ -68,21 +69,23 @@ def predict_piece_dashboard():
     total_dist = 0
 
     dev = torch.device(device)
-    dataloader = DataLoader(dataset, batch_size=1)
+    # In dataset creation, moving window is exactly 0.5 of sequence length
+    # so here, we're removing overlaps, TODO untangle this
+    dataloader = DataLoader(dataset[::2], batch_size=1)
 
     piece = MidiPiece.from_huggingface(one_record_dataset[0])
 
     predicted_piece_df = piece.df.copy()
     predicted = torch.Tensor([])
-    idx = 0
     for b in tqdm(dataloader):
-        idx += 1
-        if idx % 2 == 0:
-            continue
-        batch = Batch(b[0], b[1], pad=pad_idx)
+        batch = Batch(src=b[0], tgt=b[1], pad_idx=pad_idx)
         batch.to(dev)
         sequence = greedy_decode(
-            model=model, src=batch.src[0], src_mask=batch.src_mask[0], max_len=train_cfg.dataset.sequence_size, start_symbol=0
+            model=model,
+            src=batch.src[0],
+            src_mask=batch.src_mask[0],
+            max_len=train_cfg.dataset.sequence_size,
+            start_symbol=0,
         )
         predicted = torch.concat([predicted, sequence[1:]]).type_as(sequence.data)
 

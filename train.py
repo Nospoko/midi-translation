@@ -70,8 +70,18 @@ def train_model(
     )
     criterion.to(cfg.device)
 
-    train_dataloader = DataLoader(train_dataset, batch_size=cfg.train.batch_size, shuffle=True)
-    val_dataloader = DataLoader(val_dataset, batch_size=cfg.train.batch_size, shuffle=True)
+    train_dataloader = DataLoader(
+        dataset=train_dataset,
+        batch_size=cfg.train.batch_size,
+        shuffle=True,
+        num_workers=8,
+    )
+    val_dataloader = DataLoader(
+        dataset=val_dataset,
+        batch_size=cfg.train.batch_size,
+        shuffle=True,
+        num_workers=8,
+    )
 
     # Define optimizer and learning learning_rate_schedule lr_scheduler
     optimizer = torch.optim.Adam(model.parameters(), lr=cfg.train.base_lr, betas=(0.9, 0.98), eps=1e-9)
@@ -132,6 +142,7 @@ def train_model(
                 "val/dist_epoch": v_dist,
                 "train/loss_epoch": t_loss,
                 "train/dist_epoch": t_dist,
+                "epoch": epoch,
             }
         )
     return model
@@ -159,7 +170,7 @@ def train_epoch(
     steps = len(dataloader)
     pbar = tqdm(dataloader, total=steps)
     for b in pbar:
-        batch = Batch(b[0], b[1], pad=pad_idx)
+        batch = Batch(src=b[0], tgt=b[1], pad_idx=pad_idx)
 
         batch.to(device)
 
@@ -221,7 +232,7 @@ def val_epoch(
     total_dist = 0
 
     for b in tqdm(dataloader):
-        batch = Batch(b[0], b[1], pad=pad_idx)
+        batch = Batch(src=b[0], tgt=b[1], pad_idx=pad_idx)
         batch.to(device)
 
         encoded_decoded = model.forward(batch.src, batch.tgt, batch.src_mask, batch.tgt_mask)

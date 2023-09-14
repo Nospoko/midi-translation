@@ -143,7 +143,7 @@ def greedy_decode(
     src: torch.Tensor,
     src_mask: torch.Tensor,
     max_len: int,
-    start_symbol: int,
+    start_symbol: int = 0,
 ) -> torch.Tensor:
     # Pretend to be batches
     src = src.unsqueeze(0)

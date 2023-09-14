@@ -43,12 +43,14 @@ class TokenizedMidiDataset:
         self.samples = self.load_samples()
 
     def __rich_repr__(self):
-        yield "BinsToVelocityDataset"
+        yield "TokenizedMidiDataset"
         yield "size", len(self)
         yield "sequence_len", self.sequence_len
         yield "n_dstart_bins", self.n_dstart_bins
         yield "n_duration_bins", self.n_duration_bins
         yield "n_velocity_bins", self.n_velocity_bins
+        yield "src_vocab", len(self.src_vocab)
+        yield "tgt_vocab", len(self.tgt_vocab)
 
     def load_samples(self) -> list[tuple[list[int], list[int]]]:
         samples = []
