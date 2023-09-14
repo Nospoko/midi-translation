@@ -20,21 +20,8 @@ from utils import euclidean_distance, load_cached_dataset, learning_rate_schedul
 
 @hydra.main(version_base=None, config_path="config", config_name="conf")
 def main(cfg: DictConfig):
-    bins = "-".join(cfg.dataset.bins.split(" "))
-
-    train_data, val_data = load_datasets(cfg.dataset)
-
-    model = train_model(train_data, val_data, cfg)
-    path = f"models/{bins}-{cfg.file_prefix}-{cfg.run_name}-final.pt"
-    torch.save(
-        {
-            "model_state_dict": model.state_dict(),
-            "cfg": OmegaConf.to_object(cfg),
-            "input_size": len(train_data.src_vocab),
-            "output_size": len(train_data.tgt_vocab),
-        },
-        path,
-    )
+    train_dataset, val_dataset = load_datasets(cfg.dataset)
+    train_model(train_dataset, val_dataset, cfg)
     print(cfg.run_name)
 
 
@@ -54,14 +41,14 @@ def initialize_wandb(cfg: DictConfig):
 
 
 def train_model(
-    train_data: BinsToVelocityDataset,
-    val_data: BinsToVelocityDataset,
+    train_dataset: BinsToVelocityDataset,
+    val_dataset: BinsToVelocityDataset,
     cfg: DictConfig,
 ) -> nn.Module:
     # Get the index for padding token
-    pad_idx = train_data.tgt_vocab.index("<blank>")
-    vocab_src_size = len(train_data.src_vocab)
-    vocab_tgt_size = len(train_data.tgt_vocab)
+    pad_idx = train_dataset.tgt_vocab.index("<blank>")
+    vocab_src_size = len(train_dataset.src_vocab)
+    vocab_tgt_size = len(train_dataset.tgt_vocab)
 
     # define model parameters and create the model
     model = make_model(
@@ -83,8 +70,8 @@ def train_model(
     )
     criterion.to(cfg.device)
 
-    train_dataloader = DataLoader(train_data, batch_size=cfg.train.batch_size, shuffle=True)
-    val_dataloader = DataLoader(val_data, batch_size=cfg.train.batch_size, shuffle=True)
+    train_dataloader = DataLoader(train_dataset, batch_size=cfg.train.batch_size, shuffle=True)
+    val_dataloader = DataLoader(val_dataset, batch_size=cfg.train.batch_size, shuffle=True)
 
     # Define optimizer and learning learning_rate_schedule lr_scheduler
     optimizer = torch.optim.Adam(model.parameters(), lr=cfg.train.base_lr, betas=(0.9, 0.98), eps=1e-9)
@@ -94,6 +81,7 @@ def train_model(
     )
     initialize_wandb(cfg)
 
+    best_loss = float("inf")
     for epoch in range(cfg.train.num_epochs):
         model.train()
         print(f"Epoch {epoch}", flush=True)
@@ -124,6 +112,19 @@ def train_model(
             )
             print(float(v_loss))
 
+        if v_loss <= best_loss:
+            path = f"models/{cfg.run_name}-top-effort.pt"
+            torch.save(
+                {
+                    "model_state_dict": model.state_dict(),
+                    "cfg": OmegaConf.to_object(cfg),
+                    "input_size": len(train_dataset.src_vocab),
+                    "output_size": len(train_dataset.tgt_vocab),
+                },
+                path,
+            )
+            best_loss = v_loss
+
         # Log validation and training losses
         wandb.log(
             {
@@ -145,7 +146,7 @@ def train_epoch(
     accum_iter: int = 1,
     log_frequency: int = 10,
     pad_idx: int = 2,
-    device="cpu",
+    device: str = "cpu",
 ) -> tuple[float, float]:
     start = time.time()
     total_loss = 0
@@ -157,11 +158,10 @@ def train_epoch(
     # create progress bar
     steps = len(dataloader)
     pbar = tqdm(dataloader, total=steps)
-    dev = torch.device(device)
     for b in pbar:
         batch = Batch(b[0], b[1], pad=pad_idx)
 
-        batch.to(dev)
+        batch.to(device)
 
         encoded_decoded = model.forward(batch.src, batch.tgt, batch.src_mask, batch.tgt_mask)
         out = model.generator(encoded_decoded)
@@ -220,11 +220,9 @@ def val_epoch(
     tokens = 0
     total_dist = 0
 
-    dev = torch.device(device)
-
     for b in tqdm(dataloader):
         batch = Batch(b[0], b[1], pad=pad_idx)
-        batch.to(dev)
+        batch.to(device)
 
         encoded_decoded = model.forward(batch.src, batch.tgt, batch.src_mask, batch.tgt_mask)
         out = model.generator(encoded_decoded)

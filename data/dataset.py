@@ -23,6 +23,9 @@ class TokenizedMidiDataset:
         sequence_len: int = 128,
     ):
         self.sequence_len = sequence_len
+        self.n_dstart_bins = n_dstart_bins
+        self.n_duration_bins = n_duration_bins
+        self.n_velocity_bins = n_velocity_bins
         self.tokenizer_src = src_tokenizer
         self.tokenizer_tgt = tgt_tokenizer
 
@@ -38,6 +41,14 @@ class TokenizedMidiDataset:
 
         self.records = self._build_dataset()
         self.samples = self.load_samples()
+
+    def __rich_repr__(self):
+        yield "BinsToVelocityDataset"
+        yield "size", len(self)
+        yield "sequence_len", self.sequence_len
+        yield "n_dstart_bins", self.n_dstart_bins
+        yield "n_duration_bins", self.n_duration_bins
+        yield "n_velocity_bins", self.n_velocity_bins
 
     def load_samples(self) -> list[tuple[list[int], list[int]]]:
         samples = []

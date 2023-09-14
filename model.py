@@ -20,7 +20,7 @@ def make_model(
     d_ff: int = 2048,
     h: int = 8,
     dropout: float = 0.1,
-) -> nn.Module:
+) -> EncoderDecoder:
     """Helper: Construct a model from hyperparameters."""
     c = copy.deepcopy
     attn = MultiHeadedAttention(h=h, d_model=d_model)

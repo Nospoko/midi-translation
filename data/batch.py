@@ -15,19 +15,27 @@ class Record:
 class Batch:
     """Object for holding a batch of data with mask during training."""
 
-    def __init__(self, src: torch.Tensor, tgt=None, pad=1):  # 1 = <blank>
+    def __init__(self, src: torch.Tensor, tgt: torch.Tensor, pad_idx: int = 1):  # 1 = <blank>
         self.src = src
-        self.src_mask = (src != pad).unsqueeze(-2)
+        self.src_mask = (src != pad_idx).unsqueeze(-2)
 
         self.tgt = tgt[:, :-1]
         self.tgt_y = tgt[:, 1:]
-        self.tgt_mask = self.make_std_mask(self.tgt, pad)
-        self.ntokens = (self.tgt_y != pad).data.sum()
+        self.tgt_mask = self.make_std_mask(self.tgt, pad_idx)
+        self.ntokens = (self.tgt_y != pad_idx).data.sum()
+
+    def __rich_repr__(self):
+        yield "Batch"
+        yield "batch_size", len(self)
+        yield "src", self.src.shape
+        yield "tgt", self.tgt.shape
+        yield "tgt_y", self.tgt_y.shape
+        yield "ntokens", self.ntokens.item()
 
     @staticmethod
-    def make_std_mask(tgt, pad):
+    def make_std_mask(tgt, pad_idx):
         """Create a mask to hide padding and future words."""
-        tgt_mask = (tgt != pad).unsqueeze(-2)
+        tgt_mask = (tgt != pad_idx).unsqueeze(-2)
         tgt_mask = tgt_mask & subsequent_mask(tgt.size(-1)).type_as(tgt_mask.data)
         return tgt_mask
 
