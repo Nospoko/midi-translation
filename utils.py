@@ -12,7 +12,7 @@ from datasets import load_dataset
 from omegaconf import OmegaConf, DictConfig
 from fortepyan.audio import render as render_audio
 
-from data.dataset import BinsToVelocityDataset
+from data.dataset import BinsToVelocityDataset, TokenizedMidiDataset, BinsToDstartDataset
 from modules.encoderdecoder import subsequent_mask
 
 
@@ -59,12 +59,15 @@ def learning_rate_schedule(step: int, model_size: int, factor: float, warmup: in
     return factor * (model_size ** (-0.5) * min(step ** (-0.5), step * warmup ** (-1.5)))
 
 
-def load_cached_dataset(cfg: DictConfig, split="test") -> BinsToVelocityDataset:
+def load_cached_dataset(
+        cfg: DictConfig,
+        split: str = "test",
+) -> TokenizedMidiDataset:
     n_dstart_bins, n_duration_bins, n_velocity_bins = cfg.bins.split(" ")
     n_dstart_bins, n_duration_bins, n_velocity_bins = int(n_dstart_bins), int(n_duration_bins), int(n_velocity_bins)
 
     config_hash = hashlib.sha256()
-    config_string = json.dumps(OmegaConf.to_container(cfg)) + split
+    config_string = json.dumps(OmegaConf.to_container(cfg)) + split + cfg.dataset_class
     config_hash.update(config_string.encode())
     config_hash = config_hash.hexdigest()
     cache_dir = "tmp/datasets"
@@ -79,13 +82,10 @@ def load_cached_dataset(cfg: DictConfig, split="test") -> BinsToVelocityDataset:
         else:
             file = open(dataset_cache_path, "wb")
             hf_dataset = load_dataset(cfg.dataset_name, split=split)
-            dataset = BinsToVelocityDataset(
-                dataset=hf_dataset,
-                n_dstart_bins=n_dstart_bins,
-                n_velocity_bins=n_velocity_bins,
-                n_duration_bins=n_duration_bins,
-                sequence_len=cfg.sequence_size,
-            )
+            args = [hf_dataset, n_dstart_bins, n_velocity_bins, n_duration_bins, cfg.sequence_size]
+            if cfg.dataset_class == "BinsToDstartDataset":
+                args.append(cfg.n_tgt_dstart_bins)
+            dataset = eval(cfg.dataset_class)(*args)
             pickle.dump(dataset, file)
         file.close()
     except EOFError:

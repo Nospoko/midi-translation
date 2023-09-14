@@ -13,7 +13,7 @@ from torch.optim.lr_scheduler import LambdaLR
 import wandb
 from data.batch import Batch
 from model import make_model
-from data.dataset import BinsToVelocityDataset
+from data.dataset import BinsToVelocityDataset, TokenizedMidiDataset, BinsToDstartDataset
 from modules.label_smoothing import LabelSmoothing
 from utils import avg_distance, load_cached_dataset, learning_rate_schedule
 
@@ -40,7 +40,7 @@ def save_checkpoint(model: nn.Module, optimizer: torch.optim.Optimizer, cfg: Dic
     )
 
 
-def load_datasets(cfg: DictConfig) -> tuple[BinsToVelocityDataset, BinsToVelocityDataset]:
+def load_datasets(cfg: DictConfig) -> tuple[TokenizedMidiDataset, TokenizedMidiDataset]:
     train_dataset = load_cached_dataset(cfg=cfg, split="train")
     val_dataset = load_cached_dataset(cfg=cfg, split="validation")
 
@@ -56,8 +56,8 @@ def initialize_wandb(cfg: DictConfig):
 
 
 def train_model(
-    train_data: BinsToVelocityDataset,
-    val_data: BinsToVelocityDataset,
+    train_data: TokenizedMidiDataset,
+    val_data: TokenizedMidiDataset,
     cfg: DictConfig,
 ) -> nn.Module:
     # Get the index for padding token

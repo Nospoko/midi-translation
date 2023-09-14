@@ -108,8 +108,9 @@ class BinsToDstartDataset(TokenizedMidiDataset):
         n_dstart_bins: int = 3,
         n_duration_bins: int = 3,
         n_velocity_bins: int = 3,
-        n_tgt_dstart_bins: int = 100,
         sequence_len: int = 128,
+        n_tgt_dstart_bins: int = 100,
+
     ):
         self.n_tgt_dstart_bins = n_tgt_dstart_bins
         tokenizer_src = Tokenizer(keys=["pitch", "dstart_bin", "duration_bin", "velocity_bin"])

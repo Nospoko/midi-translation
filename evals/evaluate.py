@@ -11,7 +11,7 @@ from utils import load_cached_dataset
 from modules.label_smoothing import LabelSmoothing
 
 
-@hydra.main(version_base=None, config_path="config", config_name="eval_conf")
+@hydra.main(version_base=None, config_path="../config", config_name="eval_conf")
 def main(cfg):
     checkpoint = load_checkpoint(
         run_name=cfg.run_name,
@@ -19,11 +19,12 @@ def main(cfg):
         device=cfg.device,
     )
     train_cfg = OmegaConf.create(checkpoint["cfg"])
-    if cfg.dataset.dataset_name is None:
+    dataset_name = cfg.dataset.dataset_name
+    if dataset_name is None:
         val_data = load_cached_dataset(train_cfg.dataset, split=cfg.dataset_split)
     else:
-        cfg.dataset.bins = train_cfg.dataset.bins
-        cfg.dataset.sequence_size = train_cfg.dataset.sequence_size
+        cfg.dataset = train_cfg.dataset
+        cfg.dataset.dataset_name = dataset_name
         val_data = load_cached_dataset(cfg.dataset, split=cfg.dataset_split)
 
     dataloader = DataLoader(val_data, batch_size=train_cfg.train.batch_size)
@@ -64,7 +65,7 @@ def main(cfg):
 def load_checkpoint(run_name: str, epoch: str = "final", device: str = "cpu"):
     # find path with desired run
     path = None
-    for file in os.listdir("models"):
+    for file in os.listdir("../models"):
         if f"{run_name}" in file:
             path = file
             break

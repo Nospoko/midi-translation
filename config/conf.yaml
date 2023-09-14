@@ -7,15 +7,16 @@ train:
   label_smoothing: 0.1
 
 dataset:
+  dataset_class: BinsToDstartDataset
   dataset_name: 'roszcz/maestro-v1'
   bins: "3 3 3"
   sequence_size: 128
+  n_tgt_dstart_bins: 100
 
 device: "cpu"
 warmup: 3000
 log_frequency: 10
-file_prefix: "to-vel"
-model_path: "to-vel-final.pt"
+file_prefix: "to-dstart"
 run_name: midi-transformer-${now:%Y-%m-%d-%H-%M}
 project: "midi-transformer"
 
@@ -25,3 +26,4 @@ model:
   d_ff: 2048
   h: 8
   dropout: 0.1
+

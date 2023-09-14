@@ -15,7 +15,7 @@ from model import make_model
 from utils import piece_av_files, process_record
 from data.dataset import BinsToVelocityDataset
 from predict_piece import predict_piece_dashboard
-from evals import load_cached_dataset
+from evals.evaluate import load_cached_dataset
 
 
 @hydra.main(version_base=None, config_path="config", config_name="dashboard_conf")
@@ -231,7 +231,7 @@ def prepare_midi_pieces(
     # create MidiPieces
     piece = MidiPiece(notes)
     name = f"{filename.split('.')[0].replace('/', '-')}-{idx}-real-{bins}-{dataset.sequence_len}"
-    piece.source = json.loads(piece_source)
+    piece.source = piece_source
     piece.source["midi_filename"] = f"tmp/dashboard/common/{name}.mid"
     # piece.source["title"] = title
     # piece.source["composer"] = composer

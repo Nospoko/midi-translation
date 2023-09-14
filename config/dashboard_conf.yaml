@@ -2,6 +2,8 @@ device: "cpu"
 
 dataset_split: "test"
 dataset:
+  dataset_class: BinsToVelocityDataset
   dataset_name: "roszcz/maestro-v1"
   bins: null
   sequence_size: null
+  n_tgt_dstart_bins: null
