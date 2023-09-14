@@ -67,7 +67,12 @@ def load_cached_dataset(
     n_dstart_bins, n_duration_bins, n_velocity_bins = int(n_dstart_bins), int(n_duration_bins), int(n_velocity_bins)
 
     config_hash = hashlib.sha256()
-    config_string = json.dumps(OmegaConf.to_container(cfg)) + split + cfg.dataset_class
+    config_string = json.dumps(OmegaConf.to_container(cfg)) + split
+    # using try to handle old versions of configs in checkpoints
+    try:
+        config_string += cfg.dataset_class
+    finally:
+        pass
     config_hash.update(config_string.encode())
     config_hash = config_hash.hexdigest()
     cache_dir = "tmp/datasets"
