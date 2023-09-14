@@ -129,6 +129,7 @@ class QuantizerWithDstart(MidiQuantizer):
             n_duration_bins=n_duration_bins,
             n_velocity_bins=n_velocity_bins,
         )
+        self._build_tgt_dstart_decoder()
 
     def _load_bin_edges(self):
         # Hydra changes paths, this finds it back
@@ -150,4 +151,23 @@ class QuantizerWithDstart(MidiQuantizer):
         df["velocity_bin"] = np.digitize(df.velocity, self.velocity_bin_edges) - 1
 
         df = self.apply_quantization(df)
+        return df
+
+    def _build_tgt_dstart_decoder(self):
+        self.bin_to_tgt_dstart = []
+        for it in range(1, len(self.tgt_dstart_bin_edges)):
+            dstart = (self.tgt_dstart_bin_edges[it - 1] + self.tgt_dstart_bin_edges[it]) / 2
+            self.bin_to_tgt_dstart.append(dstart)
+
+        last_dstart = 2 * self.dstart_bin_edges[-1]
+        self.bin_to_tgt_dstart.append(last_dstart)
+
+    def apply_quantization_with_tgt_bins(self, df: pd.DataFrame) -> pd.DataFrame:
+
+        df["quant_dstart"] = df.dstart_bin.map(lambda it: self.bin_to_tgt_dstart[it])
+        df["quant_duration"] = df.duration_bin.map(lambda it: self.bin_to_duration[it])
+        df["start"] = df.quant_dstart.cumsum().shift(1).fillna(0)
+        df["end"] = df.start + df.quant_duration
+        df["duration"] = df.quant_duration
+        df["velocity"] = df.velocity_bin.map(lambda it: self.bin_to_velocity[it])
         return df

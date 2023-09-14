@@ -68,11 +68,6 @@ def load_cached_dataset(
 
     config_hash = hashlib.sha256()
     config_string = json.dumps(OmegaConf.to_container(cfg)) + split
-    # using try to handle old versions of configs in checkpoints
-    try:
-        config_string += cfg.dataset_class
-    finally:
-        pass
     config_hash.update(config_string.encode())
     config_hash = config_hash.hexdigest()
     cache_dir = "tmp/datasets"
@@ -84,19 +79,28 @@ def load_cached_dataset(
         if os.path.exists(dataset_cache_path):
             file = open(dataset_cache_path, "rb")
             dataset = pickle.load(file)
+
         else:
             file = open(dataset_cache_path, "wb")
             hf_dataset = load_dataset(cfg.dataset_name, split=split)
+
             args = [hf_dataset, n_dstart_bins, n_velocity_bins, n_duration_bins, cfg.sequence_size]
-            if cfg.dataset_class == "BinsToDstartDataset":
-                args.append(cfg.n_tgt_dstart_bins)
+            try:
+                if cfg.dataset_class == "BinsToDstartDataset":
+                    args.append(cfg.n_tgt_dstart_bins)
+            finally:
+                pass
+
             dataset = eval(cfg.dataset_class)(*args)
             pickle.dump(dataset, file)
+
         file.close()
+
     except EOFError:
         file.close()
         os.remove(path=dataset_cache_path)
-        raise EOFError
+        dataset = load_cached_dataset(cfg, split)
+
     return dataset
 
 

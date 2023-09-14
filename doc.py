@@ -110,8 +110,8 @@ The important hyperparameters:
    [roszcz/maestro-v1](https://huggingface.co/datasets/roszcz/maestro-v1) dataset containing 1276 pieces of 
    classical music performed during piano competition. 
 #### Hardware and schedule
-   Training on (very old) Nvidia GeForce GTX 960M with 4096 MiB of memory for 5 epochs (2723 steps) took only 7,5 hours.
-   Each step took ~6 seconds.
+   Training on (very old) Nvidia GeForce GTX 960M with 4096 MiB of memory for 5 epochs (27230 steps) 
+   took only 7,5 hours. Each step took ~6 seconds.
 #### Optimizer
 Optimizer and learning rate were used as described in
 [Attention is all you need](https://arxiv.org/abs/1706.03762) paper:

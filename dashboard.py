@@ -23,7 +23,7 @@ def main(cfg: DictConfig):
     with st.sidebar:
         mode = st.selectbox(label="Display", options=["Model predictions", "Predict piece", "Tokenization review"])
     if mode == "Tokenization review":
-        tokenization_review_dashboard()
+        tokenization_review_dashboard(cfg)
     if mode == "Predict piece":
         predict_piece_dashboard(cfg)
     if mode == "Model predictions":
@@ -58,12 +58,12 @@ def model_predictions_review(cfg: DictConfig):
         st.markdown("### Q. velocity")
     with cols[3]:
         st.markdown("### Predicted")
-
-    if cfg.dataset.dataset_name is None:
+    dataset_name = train_cfg.dataset.dataset_name
+    if dataset_name is None:
         dataset = load_cached_dataset(train_cfg.dataset)
     else:
-        cfg.dataset.bins = train_cfg.dataset.bins
-        cfg.dataset.sequence_size = train_cfg.dataset.sequence_size
+        cfg.dataset = train_cfg.dataset
+        cfg.dataset.dataset_name = dataset_name
         dataset = load_cached_dataset(cfg.dataset, split=cfg.dataset_split)
 
     model = make_model(
@@ -104,22 +104,26 @@ def model_predictions_review(cfg: DictConfig):
 
         source = dataset.tokenizer_src.untokenize(src)
         predicted = dataset.tokenizer_tgt.untokenize(out)
-
+        print(predicted)
         filename = record["midi_filename"]
 
         true_piece, src_piece = prepare_midi_pieces(record, source, idx=idx, dataset=dataset, bins=bins)
-        pred_piece_df = true_piece.df.copy()
-        quantized_vel_df = true_piece.df.copy()
+        quantized_col_df = true_piece.df.copy()
+        quantized_col_df[cfg.predicted_column] = src_piece.df[cfg.predicted_column].copy()
 
-        # change untokenized velocities to model predictions
-        pred_piece_df["velocity"] = predicted
-        pred_piece_df["velocity"] = pred_piece_df["velocity"].fillna(0)
-
-        quantized_vel_df["velocity"] = src_piece.df["velocity"].copy()
+        if cfg.predicted_column == "velocity":
+            pred_piece_df = true_piece.df.copy()
+            # change untokenized velocities to model predictions
+            pred_piece_df["velocity"] = predicted
+            pred_piece_df["velocity"] = pred_piece_df["velocity"].fillna(0)
+        else:
+            pred_piece_df = source.copy()
+            pred_piece_df[cfg.predicted_column] = predicted.astype("int16")
+            dataset.quantizer.apply_quantization_with_tgt_bins(pred_piece_df)
 
         # create quantized piece with predicted velocities
         pred_piece = MidiPiece(pred_piece_df)
-        quantized_vel_piece = MidiPiece(quantized_vel_df)
+        quantized_vel_piece = MidiPiece(quantized_col_df)
 
         pred_piece.source = true_piece.source.copy()
         quantized_vel_piece.source = true_piece.source.copy()
@@ -167,10 +171,18 @@ def model_predictions_review(cfg: DictConfig):
             st.table(pred_piece.source)
 
 
-def tokenization_review_dashboard():
+def tokenization_review_dashboard(cfg):
     st.markdown("### Tokenization method:\n" "**n_dstart_bins    n_duration_bins    n_velocity_bins**")
     bins = st.text_input(label="bins", value="3 3 3")
-    dataset_cfg = OmegaConf.create({"dataset_name": "roszcz/maestro-v1", "bins": bins, "sequence_size": 128})
+    dataset_cfg = OmegaConf.create(
+        {
+            "dataset_class": cfg.dataset.dataset_class,
+            "dataset_name": "roszcz/maestro-v1",
+            "bins": bins,
+            "sequence_size": 128,
+            "n_tgt_dstart_bins": None
+        }
+    )
 
     dataset = load_cached_dataset(dataset_cfg)
     bins = bins.replace(" ", "-")
@@ -230,13 +242,15 @@ def prepare_midi_pieces(
 
     # create MidiPieces
     piece = MidiPiece(notes)
-    name = f"{filename.split('.')[0].replace('/', '-')}-{idx}-real-{bins}-{dataset.sequence_len}"
     piece.source = piece_source
+
+    name = f"{filename.split('.')[0].replace('/', '-')}-{idx}-real-{bins}-{dataset.sequence_len}"
     piece.source["midi_filename"] = f"tmp/dashboard/common/{name}.mid"
     # piece.source["title"] = title
     # piece.source["composer"] = composer
 
     quantized_piece = MidiPiece(quantized_notes)
+
     name = f"{filename.split('.')[0].replace('/', '-')}-{idx}-quantized-{bins}-{dataset.sequence_len}"
     quantized_piece.source = piece.source.copy()
     quantized_piece.source["midi_filename"] = f"tmp/dashboard/common/{name}.mid"

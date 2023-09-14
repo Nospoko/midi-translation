@@ -125,7 +125,7 @@ def train_model(
                 pad_idx=pad_idx,
                 device=cfg.device,
             )
-            print(float(v_loss))
+            print(float(v_loss), float(v_dist))
             if v_loss <= best_test_loss:
                 save_checkpoint(model, optimizer, cfg)
                 best_test_loss = v_loss
@@ -197,7 +197,7 @@ def train_epoch(
         tokens += batch.ntokens
 
         # log metrics every log_frequency steps
-        if it % log_frequency == 1:
+        if it % log_frequency == 0:
             lr = optimizer.param_groups[0]["lr"]
             elapsed = time.time() - start
             tok_rate = tokens / elapsed

@@ -48,7 +48,7 @@ def predict_piece_dashboard(cfg: DictConfig):
         with st.sidebar:
             midi_filename = st.selectbox(label="piece", options=[filename for filename in hf_dataset["midi_filename"]])
         one_record_dataset = hf_dataset.filter(lambda x: x["midi_filename"] == midi_filename)
-    dataset = BinsToVelocityDataset(
+    dataset = eval(cfg.dataset_class)(
         dataset=one_record_dataset,
         n_dstart_bins=eval(n_dstart_bins),
         n_duration_bins=eval(n_duration_bins),
