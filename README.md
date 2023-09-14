@@ -56,11 +56,10 @@ To start the dashboard you need to run streamlit.
 
 You can choose which dataset you would like to use by setting dataset.dataset_name parameter
 
-If you are using roszcz/giant-midi-sustain you also need to change dataset_split parameter to "train":
+If you are using roszcz/giant-midi-sustain you also need to change dataset_split parameter to "train", for example:
 ```shell
-streamlit run --server.port 4466 dashboard.py dataset.dataset_name="roszcz/giant-midi-sustain" dataset_split="train"
+streamlit run --server.port 4466 dashboard.py dataset.dataset_name="roszcz/giant-midi-sustain" "dataset_split='train[10%]'"
 
-```
 #### Tokenization review dashboard
 You can try out different tokenization methods i.e. different nuber of bins by
 choosing Tokenization review option from "Display" selectbox.

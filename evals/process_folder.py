@@ -1,17 +1,17 @@
-import glob
 import os
+import glob
 
-from tqdm import tqdm
-
-from data.dataset import BinsToVelocityDataset
-import fortepyan as ff
-import torch
-from evals.evaluate import load_checkpoint
-from datasets import Dataset
 import hydra
-from omegaconf import DictConfig, OmegaConf
+import torch
+import fortepyan as ff
+from tqdm import tqdm
+from datasets import Dataset
+from omegaconf import OmegaConf, DictConfig
+
 from model import make_model
 from utils import predict_sample
+from evals.evaluate import load_checkpoint
+from data.dataset import BinsToVelocityDataset
 
 
 @hydra.main(version_base=None, config_path="../config", config_name="process_conf")
@@ -66,7 +66,7 @@ def main(cfg: DictConfig):
 
         pred_piece = ff.MidiPiece(pred_df)
         pred_piece.source = piece.source.copy()
-        pred_path = cfg.output_dir + os.path.basename(file).split('.')[0] + "-pred.mid"
+        pred_path = cfg.output_dir + "/" + os.path.basename(file).split(".")[0] + "-pred.mid"
         pred_piece.to_midi().write(pred_path)
 
 
