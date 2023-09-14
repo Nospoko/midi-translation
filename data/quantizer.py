@@ -1,8 +1,3 @@
-"""
-MidiQuantizer by JasiekKaczmarczyk
-from https://github.com/Nospoko/midi-clip/blob/MIDI-44/midi-clip/data/quantizer.py
-"""
-
 import yaml
 import numpy as np
 import pandas as pd
@@ -53,14 +48,12 @@ class MidiQuantizer:
 
         # Make the quantization
         df = self.quantize_frame(df)
-
         out = MidiPiece(df=df, source=source)
         return out
 
     def quantize_frame(self, df: pd.DataFrame) -> pd.DataFrame:
         df["next_start"] = df.start.shift(-1)
         df["dstart"] = df.next_start - df.start
-
         df["dstart_bin"] = np.digitize(df.dstart.fillna(0), self.dstart_bin_edges) - 1
         df["duration_bin"] = np.digitize(df.duration, self.duration_bin_edges) - 1
         df["velocity_bin"] = np.digitize(df.velocity, self.velocity_bin_edges) - 1

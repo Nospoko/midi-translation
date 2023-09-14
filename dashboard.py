@@ -1,5 +1,6 @@
 import os
 import glob
+import json
 
 import hydra
 import torch
@@ -11,10 +12,10 @@ from omegaconf import OmegaConf, DictConfig
 from hydra.core.global_hydra import GlobalHydra
 
 from model import make_model
-from utils import piece_av_files
 from data.dataset import BinsToVelocityDataset
+from evals.evaluate import load_cached_dataset
+from utils import piece_av_files, predict_sample
 from predict_piece import predict_piece_dashboard
-from evals import make_examples, load_cached_dataset
 
 
 @hydra.main(version_base=None, config_path="config", config_name="dashboard_conf")
@@ -39,7 +40,6 @@ def model_predictions_review(cfg: DictConfig):
     with st.sidebar:
         # options
         path = st.selectbox(label="model", options=glob.glob("models/*.pt"))
-        start_index = eval(st.text_input(label="start index", value="0"))
 
     # load checkpoint
     checkpoint = torch.load(path, map_location=cfg.device)
@@ -76,37 +76,42 @@ def model_predictions_review(cfg: DictConfig):
         dropout=train_cfg.model.dropout,
     )
     model.load_state_dict(checkpoint["model_state_dict"])
+    model.to(cfg.device)
 
     n_samples = 5
+    idxs = np.random.randint(len(dataset), size=n_samples)
+
+    records = [dataset.records[idx] for idx in idxs]
+    samples = [dataset[idx] for idx in idxs]
+
+    pad_idx = dataset.tgt_vocab.index("<blank>")
+    bins = train_cfg.dataset.bins.replace(" ", "-")
+
     # predict velocities and get src, tgt and model output
     print("Making predictions ...")
-    results = make_examples(dataset=dataset, model=model, start_index=start_index, n_examples=n_samples)
+    for record, sample, idx in zip(records, samples, idxs):
+        result = predict_sample(
+            record=sample,
+            dataset=dataset,
+            model=model,
+            cfg=cfg,
+            train_cfg=train_cfg,
+        )
+        src = [dataset.src_vocab[x] for x in sample[0] if x != pad_idx]
+        # tgt = [dataset.tgt_vocab[x] for x in sample[1] if x != pad_idx]
+        out = result
+        record["source"] = json.loads(record["source"])
 
-    bins = train_cfg.dataset.bins.replace(" ", "-")
-    for it in range(n_samples):
-        # use every second record, so as not to create overlapped examples - it works together with make_examples()
-        idx = it * 2
-
-        src = results[it]["src"]
-        out = results[it]["out"]
-
-        # get unprocessed data
-        record = dataset.records[idx + start_index]
-
-        # get untokenized source data
         source = dataset.tokenizer_src.untokenize(src)
         predicted = dataset.tokenizer_tgt.untokenize(out)
-        # velocities = dataset.tokenizer_tgt.untokenize(tgt)
 
         filename = record["midi_filename"]
 
-        # prepare unprocessed and tokenized midi pieces
-        true_piece, src_piece = prepare_midi_pieces(record, source, idx=idx + start_index, dataset=dataset, bins=bins)
+        true_piece, src_piece = prepare_midi_pieces(record, source, idx=idx, dataset=dataset, bins=bins)
         pred_piece_df = true_piece.df.copy()
         quantized_vel_df = true_piece.df.copy()
 
         # change untokenized velocities to model predictions
-        # TODO: predictions are sometimes the length of 127 or 126 instead of 128 ???
         pred_piece_df["velocity"] = predicted
         pred_piece_df["velocity"] = pred_piece_df["velocity"].fillna(0)
 
@@ -123,11 +128,14 @@ def model_predictions_review(cfg: DictConfig):
         if not os.path.exists(model_dir):
             os.mkdir(model_dir)
 
-        name = f"{filename.split('.')[0].replace('/', '-')}-{idx + start_index}-"
         directory = "tmp/dashboard/"
+
+        name = f"{filename.split('.')[0].replace('/', '-')}-{idx}"
+        pred_piece.source = true_piece.source.copy()
         pred_piece.source["midi_filename"] = model_dir + "/" + name + ".mid"
 
-        name = f"{filename.split('.')[0].replace('/', '-')}-{idx + start_index}-qv-{bins}-{dataset.sequence_len}-"
+        name = f"{filename.split('.')[0].replace('/', '-')}-{idx}-qv-{bins}-{dataset.sequence_len}"
+        quantized_vel_piece.source = true_piece.source.copy()
         quantized_vel_piece.source["midi_filename"] = directory + "common/" + name + ".mid"
 
         print("Creating files ...")
@@ -166,6 +174,7 @@ def tokenization_review_dashboard():
 
     dataset = load_cached_dataset(dataset_cfg)
     bins = bins.replace(" ", "-")
+
     n_samples = 5
     cols = st.columns(2)
     with cols[0]:
@@ -202,7 +211,7 @@ def prepare_midi_pieces(
 ) -> tuple[MidiPiece, MidiPiece]:
     # get dataframes with notes
     processed_df = pd.DataFrame(processed)
-
+    piece_source = record.pop("source")
     notes = pd.DataFrame(record)
     quantized_notes = dataset.quantizer.apply_quantization(processed_df)
     # we have to pop midi_filename column
@@ -222,13 +231,15 @@ def prepare_midi_pieces(
     # create MidiPieces
     piece = MidiPiece(notes)
     name = f"{filename.split('.')[0].replace('/', '-')}-{idx}-real-{bins}-{dataset.sequence_len}"
-    piece.source["midi_filename"] = "tmp/dashboard/common/" + name + ".mid"
+    piece.source = piece_source
+    piece.source["midi_filename"] = f"tmp/dashboard/common/{name}.mid"
     # piece.source["title"] = title
     # piece.source["composer"] = composer
 
     quantized_piece = MidiPiece(quantized_notes)
     name = f"{filename.split('.')[0].replace('/', '-')}-{idx}-quantized-{bins}-{dataset.sequence_len}"
-    quantized_piece.source["midi_filename"] = "tmp/dashboard/common/" + name + ".mid"
+    quantized_piece.source = piece.source.copy()
+    quantized_piece.source["midi_filename"] = f"tmp/dashboard/common/{name}.mid"
     # quantized_piece.source["title"] = title
     # quantized_piece.source["composer"] = composer
 

@@ -13,10 +13,9 @@ from omegaconf import OmegaConf, DictConfig
 
 from data.batch import Batch
 from model import make_model
-from evals import greedy_decode
 from data.dataset import BinsToVelocityDataset
-from utils import avg_distance, piece_av_files
 from modules.label_smoothing import LabelSmoothing
+from utils import avg_distance, greedy_decode, piece_av_files
 
 
 @torch.no_grad()
@@ -86,6 +85,7 @@ def predict_piece_dashboard(cfg: DictConfig):
     dataloader = DataLoader(dataset, batch_size=1)
 
     piece = MidiPiece.from_huggingface(one_record_dataset[0])
+
     piece.source["midi_filename"] = midi_filename
 
     predicted_piece_df = piece.df.copy()
