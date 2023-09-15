@@ -1,6 +1,5 @@
 device: "cpu"
 
-predicted_column: "velocity"
 dataset_split: "test"
 dataset:
   dataset_class: BinsToVelocityDataset

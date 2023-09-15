@@ -163,7 +163,6 @@ class QuantizerWithDstart(MidiQuantizer):
         self.bin_to_tgt_dstart.append(last_dstart)
 
     def apply_quantization_with_tgt_bins(self, df: pd.DataFrame) -> pd.DataFrame:
-
         df["quant_dstart"] = df.dstart_bin.map(lambda it: self.bin_to_tgt_dstart[it])
         df["quant_duration"] = df.duration_bin.map(lambda it: self.bin_to_duration[it])
         df["start"] = df.quant_dstart.cumsum().shift(1).fillna(0)

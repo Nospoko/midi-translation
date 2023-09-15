@@ -12,7 +12,7 @@ from datasets import load_dataset
 from omegaconf import OmegaConf, DictConfig
 from fortepyan.audio import render as render_audio
 
-from data.dataset import BinsToVelocityDataset, TokenizedMidiDataset, BinsToDstartDataset
+from data.dataset import TokenizedMidiDataset
 from modules.encoderdecoder import subsequent_mask
 
 
@@ -60,8 +60,8 @@ def learning_rate_schedule(step: int, model_size: int, factor: float, warmup: in
 
 
 def load_cached_dataset(
-        cfg: DictConfig,
-        split: str = "test",
+    cfg: DictConfig,
+    split: str = "test",
 ) -> TokenizedMidiDataset:
     n_dstart_bins, n_duration_bins, n_velocity_bins = cfg.bins.split(" ")
     n_dstart_bins, n_duration_bins, n_velocity_bins = int(n_dstart_bins), int(n_duration_bins), int(n_velocity_bins)
@@ -96,7 +96,7 @@ def load_cached_dataset(
 
         file.close()
 
-    except EOFError:
+    except (EOFError, ConnectionError):
         file.close()
         os.remove(path=dataset_cache_path)
         dataset = load_cached_dataset(cfg, split)
@@ -104,7 +104,7 @@ def load_cached_dataset(
     return dataset
 
 
-def process_record(record, dataset: BinsToVelocityDataset, model, cfg, train_cfg):
+def process_record(record, dataset: TokenizedMidiDataset, model, cfg, train_cfg):
     pad_idx = dataset.tgt_vocab.index("<blank>")
     src_mask = (record[0] != pad_idx).unsqueeze(-2)
 

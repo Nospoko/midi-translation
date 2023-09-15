@@ -1,6 +1,6 @@
-import json
 import os
 import glob
+import json
 
 import hydra
 import torch
@@ -12,10 +12,10 @@ from omegaconf import OmegaConf, DictConfig
 from hydra.core.global_hydra import GlobalHydra
 
 from model import make_model
-from utils import piece_av_files, process_record
-from data.dataset import BinsToVelocityDataset
-from predict_piece import predict_piece_dashboard
 from evals.evaluate import load_cached_dataset
+from utils import piece_av_files, process_record
+from predict_piece import predict_piece_dashboard
+from data.dataset import BinsToDstartDataset, TokenizedMidiDataset, BinsToVelocityDataset
 
 
 @hydra.main(version_base=None, config_path="config", config_name="dashboard_conf")
@@ -104,25 +104,33 @@ def model_predictions_review(cfg: DictConfig):
 
         source = dataset.tokenizer_src.untokenize(src)
         predicted = dataset.tokenizer_tgt.untokenize(out)
-        print(predicted)
         filename = record["midi_filename"]
 
         true_piece, src_piece = prepare_midi_pieces(record, source, idx=idx, dataset=dataset, bins=bins)
-        quantized_col_df = true_piece.df.copy()
-        quantized_col_df[cfg.predicted_column] = src_piece.df[cfg.predicted_column].copy()
 
-        if cfg.predicted_column == "velocity":
+        if type(dataset) == BinsToVelocityDataset:
+            predicted_column = "velocity"
             pred_piece_df = true_piece.df.copy()
             # change untokenized velocities to model predictions
             pred_piece_df["velocity"] = predicted
             pred_piece_df["velocity"] = pred_piece_df["velocity"].fillna(0)
-        else:
+        elif type(dataset) == BinsToDstartDataset:
+            predicted_column = "dstart_bin"
+
             pred_piece_df = source.copy()
-            pred_piece_df[cfg.predicted_column] = predicted.astype("int16")
+            pred_piece_df["dstart_bin"] = predicted.astype("int16")
+            # get quantized df with predictions
             dataset.quantizer.apply_quantization_with_tgt_bins(pred_piece_df)
+            # make df like an original but with predicted dstart
+            pred_piece_df[["velocity", "duration"]] = true_piece.df[["velocity", "duration"]].copy()
+            pred_piece_df["end"] = pred_piece_df["start"] + pred_piece_df["duration"]
+
+        pred_piece = MidiPiece(pred_piece_df)
 
         # create quantized piece with predicted velocities
-        pred_piece = MidiPiece(pred_piece_df)
+        quantized_col_df = true_piece.df.copy()
+        quantized_col_df[predicted_column] = src_piece.df[predicted_column].copy()
+
         quantized_vel_piece = MidiPiece(quantized_col_df)
 
         pred_piece.source = true_piece.source.copy()
@@ -180,7 +188,7 @@ def tokenization_review_dashboard(cfg):
             "dataset_name": "roszcz/maestro-v1",
             "bins": bins,
             "sequence_size": 128,
-            "n_tgt_dstart_bins": None
+            "n_tgt_dstart_bins": None,
         }
     )
 
@@ -219,7 +227,7 @@ def tokenization_review_dashboard(cfg):
 
 
 def prepare_midi_pieces(
-    record: dict, processed: dict, idx: int, dataset: BinsToVelocityDataset, bins: str = "3-3-3"
+    record: dict, processed: dict, idx: int, dataset: TokenizedMidiDataset, bins: str = "3-3-3"
 ) -> tuple[MidiPiece, MidiPiece]:
     # get dataframes with notes
     processed_df = pd.DataFrame(processed)

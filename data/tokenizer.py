@@ -26,7 +26,6 @@ class Tokenizer:
         for token in tokens:
             if token in self.specials:
                 continue
-
             values_txt = token.split("-")
             values = [eval(txt) for txt in values_txt]
 

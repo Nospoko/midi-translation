@@ -1,3 +1,4 @@
+import os
 import glob
 
 import hydra
@@ -13,9 +14,9 @@ from omegaconf import OmegaConf, DictConfig
 
 from data.batch import Batch
 from model import make_model
-from data.dataset import BinsToVelocityDataset
 from modules.label_smoothing import LabelSmoothing
-from utils import avg_distance, greedy_decode, piece_av_files
+from utils import avg_distance, piece_av_files, process_record
+from data.dataset import BinsToDstartDataset, BinsToVelocityDataset
 
 
 @torch.no_grad()
@@ -48,7 +49,7 @@ def predict_piece_dashboard(cfg: DictConfig):
         with st.sidebar:
             midi_filename = st.selectbox(label="piece", options=[filename for filename in hf_dataset["midi_filename"]])
         one_record_dataset = hf_dataset.filter(lambda x: x["midi_filename"] == midi_filename)
-    dataset = eval(cfg.dataset_class)(
+    dataset = eval(train_cfg.dataset.dataset_class)(
         dataset=one_record_dataset,
         n_dstart_bins=eval(n_dstart_bins),
         n_duration_bins=eval(n_duration_bins),
@@ -87,8 +88,8 @@ def predict_piece_dashboard(cfg: DictConfig):
     piece = MidiPiece.from_huggingface(one_record_dataset[0])
     piece.source["midi_filename"] = midi_filename
 
-    predicted_piece_df = piece.df.copy()
-    predicted = torch.Tensor([]).to(dev)
+    source = torch.Tensor([]).to(dev)
+    predicted_tokens = []
     idx = 0
     for b in tqdm(dataloader):
         idx += 1
@@ -96,15 +97,11 @@ def predict_piece_dashboard(cfg: DictConfig):
             continue
         batch = Batch(b[0], b[1], pad=pad_idx)
         batch.to(dev)
-        sequence = greedy_decode(
-            model=model,
-            src=batch.src[0],
-            src_mask=batch.src_mask[0],
-            max_len=train_cfg.dataset.sequence_size,
-            start_symbol=0,
-            device=cfg.device,
-        )
-        predicted = torch.concat([predicted, sequence[1:]]).type_as(sequence.data)
+
+        sequence = process_record(batch.src, dataset, model, cfg, train_cfg)
+
+        predicted_tokens += sequence
+        source = torch.concat([source, batch.src[0]]).type_as(batch.src[0].data)
 
         encoded_decoded = model.forward(batch.src, batch.tgt, batch.src_mask, batch.tgt_mask)
         out = model.generator(encoded_decoded)
@@ -115,13 +112,31 @@ def predict_piece_dashboard(cfg: DictConfig):
         total_loss += loss.item()
         total_dist += avg_distance(out_rearranged, target).cpu()
 
-    predicted = [dataset.tgt_vocab[x] for x in predicted]
-    pred_velocities = dataset.tokenizer_tgt.untokenize(predicted)
-    predicted_piece_df = predicted_piece_df.head(len(pred_velocities))
+    source_tokens = [dataset.src_vocab[x] for x in source]
+    pred_df = dataset.tokenizer_tgt.untokenize(predicted_tokens)
+    src_df = dataset.tokenizer_src.untokenize(source_tokens)
 
-    predicted_piece_df["velocity"] = pred_velocities.fillna(0)
+    if type(dataset) == BinsToVelocityDataset:
+        predicted_piece_df = piece.df.copy()
+        # change untokenized velocities to model predictions
+        predicted_piece_df["velocity"] = pred_df
+        predicted_piece_df["velocity"] = predicted_piece_df["velocity"].fillna(0)
+    elif type(dataset) == BinsToDstartDataset:
+        predicted_piece_df = src_df.copy()
+        predicted_piece_df["dstart_bin"] = pred_df["tgt_dstart_bin"]
+        # get quantized df with predictions
+        dataset.quantizer.apply_quantization_with_tgt_bins(predicted_piece_df)
+        # make df like an original but with predicted dstart
+        predicted_piece_df[["velocity", "duration"]] = piece.df[["velocity", "duration"]].copy()
+        predicted_piece_df["end"] = predicted_piece_df["start"] + predicted_piece_df["duration"]
+
     predicted_piece = MidiPiece(predicted_piece_df)
     predicted_piece.source = piece.source.copy()
+
+    model_dir = f"tmp/dashboard/{train_cfg.run_name}"
+    if not os.path.exists(model_dir):
+        os.mkdir(model_dir)
+
     midi_filename = midi_filename.split(".")[0].replace("/", "-")
     predicted_piece.source["midi_filename"] = f"tmp/dashboard/{train_cfg.run_name}/{midi_filename}-pred.mid"
     piece.source["midi_filename"] = f"tmp/dashboard/common/{midi_filename}.mid"

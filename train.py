@@ -13,7 +13,7 @@ from torch.optim.lr_scheduler import LambdaLR
 import wandb
 from data.batch import Batch
 from model import make_model
-from data.dataset import BinsToVelocityDataset, TokenizedMidiDataset, BinsToDstartDataset
+from data.dataset import TokenizedMidiDataset
 from modules.label_smoothing import LabelSmoothing
 from utils import avg_distance, load_cached_dataset, learning_rate_schedule
 
