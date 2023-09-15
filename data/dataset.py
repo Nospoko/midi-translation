@@ -39,7 +39,7 @@ class TokenizedMidiDataset:
         self.records = self._build_dataset()
         self.samples = self.load_samples()
 
-    def load_samples(self) -> list[tuple[list[int], list[int]]]:
+    def load_samples(self) -> list[tuple[torch.Tensor, torch.Tensor]]:
         samples = []
 
         pbar = tqdm(self.records, total=len(self.records))
@@ -82,21 +82,15 @@ class TokenizedMidiDataset:
             "velocity_bin": range(self.quantizer.n_velocity_bins),
         }
 
-        src_product = itertools.product(
-            iterators[self.tokenizer_src.keys[0]],
-            iterators[self.tokenizer_src.keys[1]],
-        )
+        src_product = itertools.product((iterators[key] for key in self.tokenizer_src.keys))
 
-        tgt_product = itertools.product(
-            iterators[self.tokenizer_tgt.keys[0]],
-            iterators[self.tokenizer_tgt.keys[1]],
-        )
+        tgt_product = itertools.product((iterators[key] for key in self.tokenizer_tgt.keys))
 
-        for val1, val2 in src_product:
-            key = f"{val1}-{val2}"
+        for values in src_product:
+            key = "-".join(values)
             vocab_src.append(key)
-        for val1, val2 in tgt_product:
-            key = f"{val1}-{val2}"
+        for values in tgt_product:
+            key = "-".join(values)
             vocab_tgt.append(key)
 
         return vocab_src, vocab_tgt
@@ -150,25 +144,6 @@ class BinsToVelocityDataset(TokenizedMidiDataset):
             vocab_tgt.append(key)
 
         return vocab_src, vocab_tgt
-
-    def load_samples(self) -> list[tuple[list[int], list[int]]]:
-        samples = []
-
-        pbar = tqdm(self.records, total=len(self.records))
-
-        print("Tokenizing ... ")
-        for processed_record in pbar:
-            src_tokens = self.tokenizer_src(processed_record)
-            tgt_tokens = self.tokenizer_tgt(processed_record)
-
-            src_processed = [self.src_vocab.index(token) for token in src_tokens]
-            tgt_processed = [self.tgt_vocab.index(token) for token in tgt_tokens]
-
-            src = torch.tensor(src_processed, dtype=torch.int64)
-            tgt = torch.tensor(tgt_processed, dtype=torch.int64)
-
-            samples.append((src, tgt))
-        return samples
 
 
 def main():
