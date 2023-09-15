@@ -2,20 +2,17 @@ import glob
 
 import hydra
 import torch
-import einops
 import pandas as pd
 import streamlit as st
 from tqdm import tqdm
 from fortepyan import MidiPiece
 from datasets import load_dataset
-from torch.utils.data import DataLoader
 from omegaconf import OmegaConf, DictConfig
 
-from data.batch import Batch
 from model import make_model
 from data.dataset import BinsToVelocityDataset
 from modules.label_smoothing import LabelSmoothing
-from utils import avg_distance, greedy_decode, piece_av_files
+from utils import avg_distance, piece_av_files, decode_and_output
 
 
 @torch.no_grad()
@@ -48,6 +45,7 @@ def predict_piece_dashboard(cfg: DictConfig):
         with st.sidebar:
             midi_filename = st.selectbox(label="piece", options=[filename for filename in hf_dataset["midi_filename"]])
         one_record_dataset = hf_dataset.filter(lambda x: x["midi_filename"] == midi_filename)
+
     dataset = BinsToVelocityDataset(
         dataset=one_record_dataset,
         n_dstart_bins=eval(n_dstart_bins),
@@ -82,14 +80,12 @@ def predict_piece_dashboard(cfg: DictConfig):
     total_dist = 0
 
     dev = torch.device(dev)
-    dataloader = DataLoader(dataset, batch_size=1)
 
     piece = MidiPiece.from_huggingface(one_record_dataset[0])
 
     piece.source["midi_filename"] = midi_filename
 
     predicted_piece_df = piece.df.copy()
-    predicted = torch.Tensor([]).to(dev)
     predicted_tokens = []
     idx = 0
     for record in tqdm(dataset):
@@ -111,7 +107,6 @@ def predict_piece_dashboard(cfg: DictConfig):
 
         out_tokens = [dataset.tgt_vocab[x] for x in decoded if x != pad_idx]
         predicted_tokens += out_tokens
-        source = torch.concat([source, record[0]]).type_as(record[0].data)
 
         target = record[1][1:-1].to(dev)
         n_tokens = (target != pad_idx).data.sum()
@@ -119,20 +114,17 @@ def predict_piece_dashboard(cfg: DictConfig):
         total_loss += loss.item()
         total_dist += avg_distance(out, target).cpu()
 
-    source_tokens = [dataset.src_vocab[x] for x in source]
-    pred_df = dataset.tokenizer_tgt.untokenize(predicted_tokens)
-    src_df = dataset.tokenizer_src.untokenize(source_tokens)
-
-    predicted = [dataset.tgt_vocab[x] for x in predicted]
-    pred_velocities = dataset.tokenizer_tgt.untokenize(predicted)
+    pred_velocities = dataset.tokenizer_tgt.untokenize(predicted_tokens)
     predicted_piece_df = predicted_piece_df.head(len(pred_velocities))
 
     predicted_piece_df["velocity"] = pred_velocities.fillna(0)
     predicted_piece = MidiPiece(predicted_piece_df)
+
     predicted_piece.source = piece.source.copy()
     midi_filename = midi_filename.split(".")[0].replace("/", "-")
     predicted_piece.source["midi_filename"] = f"tmp/dashboard/{train_cfg.run_name}/{midi_filename}-pred.mid"
     piece.source["midi_filename"] = f"tmp/dashboard/common/{midi_filename}.mid"
+
     pred_paths = piece_av_files(predicted_piece)
     paths = piece_av_files(piece)
 
