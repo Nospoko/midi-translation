@@ -15,7 +15,7 @@ from omegaconf import OmegaConf, DictConfig
 from data.batch import Batch
 from model import make_model
 from modules.label_smoothing import LabelSmoothing
-from utils import avg_distance, piece_av_files, process_record
+from utils import avg_distance, piece_av_files, process_record, greedy_decode, decode_and_output
 from data.dataset import BinsToDstartDataset, BinsToVelocityDataset
 
 
@@ -91,6 +91,7 @@ def predict_piece_dashboard(cfg: DictConfig):
     source = torch.Tensor([]).to(dev)
     predicted_tokens = []
     idx = 0
+    # I use batches here, because it is easier to evaluate predictions that way
     for b in tqdm(dataloader):
         idx += 1
         if idx % 2 == 0:
@@ -98,19 +99,25 @@ def predict_piece_dashboard(cfg: DictConfig):
         batch = Batch(b[0], b[1], pad=pad_idx)
         batch.to(dev)
 
-        sequence = process_record(batch.src, dataset, model, cfg, train_cfg)
+        pad_idx = dataset.tgt_vocab.index("<blank>")
 
-        predicted_tokens += sequence
+        decoded, out = decode_and_output(
+            model=model,
+            src=batch.src[0],
+            src_mask=batch.src_mask[0],
+            max_len=train_cfg.dataset.sequence_size + 1,
+            start_symbol=0,
+            device=cfg.device,
+        )
+
+        out_tokens = [dataset.tgt_vocab[x] for x in decoded if x != pad_idx]
+        predicted_tokens += out_tokens
         source = torch.concat([source, batch.src[0]]).type_as(batch.src[0].data)
 
-        encoded_decoded = model.forward(batch.src, batch.tgt, batch.src_mask, batch.tgt_mask)
-        out = model.generator(encoded_decoded)
-
-        out_rearranged = einops.rearrange(out, "b n d -> (b n) d")
         target = einops.rearrange(batch.tgt_y, "b n -> (b n)")
-        loss = criterion(out_rearranged, target) / batch.ntokens
+        loss = criterion(out, target) / batch.ntokens
         total_loss += loss.item()
-        total_dist += avg_distance(out_rearranged, target).cpu()
+        total_dist += avg_distance(out, target).cpu()
 
     source_tokens = [dataset.src_vocab[x] for x in source]
     pred_df = dataset.tokenizer_tgt.untokenize(predicted_tokens)

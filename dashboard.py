@@ -55,7 +55,7 @@ def model_predictions_review(cfg: DictConfig):
     with cols[1]:
         st.markdown("### Quantized")
     with cols[2]:
-        st.markdown("### Q. velocity")
+        st.markdown("### Q. column")
     with cols[3]:
         st.markdown("### Predicted")
     dataset_name = train_cfg.dataset.dataset_name
@@ -98,7 +98,7 @@ def model_predictions_review(cfg: DictConfig):
             train_cfg=train_cfg,
         )
         src = [dataset.src_vocab[x] for x in sample[0] if x != pad_idx]
-        # tgt = [dataset.tgt_vocab[x] for x in sample[1] if x != pad_idx]
+
         out = result
         record["source"] = json.loads(record["source"])
 

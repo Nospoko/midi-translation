@@ -15,16 +15,16 @@ def main():
 # MIDI Velocity Prediction with Transformer Model
 
 ### Introduction
-MIDI velocity is a crucial element in music dynamics, determining the force with which a note is played, 
-which profoundly influences the emotional quality of music. 
+MIDI velocity is a crucial element in music dynamics, determining the force with which a note is played,
+which profoundly influences the emotional quality of music.
 
-Our Transformer-based model aims to decode 
-this nuanced aspect of musical expression, unraveling the hidden patterns 
+Our Transformer-based model aims to decode
+this nuanced aspect of musical expression, unraveling the hidden patterns
 within quantized MIDI data.
 
 ### Model Overview
-    
-The Transformer model is ideal for this task because it excels at capturing complex dependencies in sequential 
+
+The Transformer model is ideal for this task because it excels at capturing complex dependencies in sequential
 data, making it well-suited for predicting MIDI velocities accurately.
 
 This model's suitability arises from its self-attention mechanism,
@@ -35,13 +35,13 @@ and leverage complex relationships between musical notes, their timing,
 and how these factors influence the resulting velocity.
 
 Strong prediction results signify the model's proficiency in extracting vital
-features and comprehending intricate relationships. 
+features and comprehending intricate relationships.
 Its accurate encoding of quantized MIDI data and precise velocity predictions
 mark a significant stride toward the realm of emotionally resonant AI music generation.
 ### Data Preprocessing
 #### MIDI data
 MIDI data describes notes by 5 features:
-   1. Pitch - Represented as a number between 0 and 127 (or 21 to 108 for piano keys, reflecting the 
+   1. Pitch - Represented as a number between 0 and 127 (or 21 to 108 for piano keys, reflecting the
    standard 88-key keyboard).
    2. Start - Indicates the moment a key is pressed, measured in seconds.
    3. End - Marks the second when the key is released.
@@ -49,7 +49,7 @@ MIDI data describes notes by 5 features:
    5. Velocity - ranging from 0 to 128, indicating the intensity of the key press.
 
 #### Quantization
-To achieve consistent quantization regardless of tempo variations and piece duration, 
+To achieve consistent quantization regardless of tempo variations and piece duration,
 we first engineered a more suitable representation of the notes:
 
 1. Pitch - same as above.
@@ -106,11 +106,11 @@ The important hyperparameters:
 
 ### Training and Evaluation
 #### Data
-   The model was trained on ~200 hours of musical data from 
-   [roszcz/maestro-v1](https://huggingface.co/datasets/roszcz/maestro-v1) dataset containing 1276 pieces of 
-   classical music performed during piano competition. 
+   The model was trained on ~200 hours of musical data from
+   [roszcz/maestro-v1](https://huggingface.co/datasets/roszcz/maestro-v1) dataset containing 1276 pieces of
+   classical music performed during piano competition.
 #### Hardware and schedule
-   Training on (very old) Nvidia GeForce GTX 960M with 4096 MiB of memory for 5 epochs (27230 steps) 
+   Training on (very old) Nvidia GeForce GTX 960M with 4096 MiB of memory for 5 epochs (27230 steps)
    took only 7,5 hours. Each step took ~6 seconds.
 #### Optimizer
 Optimizer and learning rate were used as described in
@@ -121,7 +121,7 @@ Optimizer and learning rate were used as described in
 
 This corresponds to increasing the learning rate linearly for the first warmup_steps training steps,
 and decreasing it thereafter proportionally to the inverse square root of the step number. We used
-warmup_steps = 3000. 
+warmup_steps = 3000.
 #### Results
 The model reaches **2.57 loss** and **5.13 average distance** between prediction and real value.
 In contrast - untrained model has a **4.9 loss** and **30.7 average distance**
@@ -134,7 +134,7 @@ Click below to plot new random sample.
     # Using a list, so I will be able to change the value inside the function
     idx = [0]
     st.button("Random", on_click=set_random(idx, length=len(samples) - 1))
-    sample_idx = os.path.basename(samples[idx[0]]).split('-')[0]
+    sample_idx = os.path.basename(samples[idx[0]]).split("-")[0]
     sample_cols = st.columns(4)
     with sample_cols[0]:
         st.markdown("**Original**")

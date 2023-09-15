@@ -218,7 +218,7 @@ def val_epoch(
     dataloader: Iterable,
     model: nn.Module,
     criterion: Callable,
-    pad_idx: int = 2,
+    pad_idx: int = 1,
     device: str = "cpu",
 ) -> tuple[float, float]:
     total_tokens = 0

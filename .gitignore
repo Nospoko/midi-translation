@@ -7,3 +7,8 @@ outputs/*
 wandb/*
 models/*
 documentation/files
+update_checkpoints.py
+upload_models.py
+predicted_midi/*
+midi_files/*
+documentation/presentation.md
