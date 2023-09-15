@@ -104,7 +104,7 @@ def make_examples(
     dataloader = DataLoader(dataset, shuffle=random)
     idx = -1
     for b in dataloader:
-        batch = Batch(b[0], b[1], pad_idx)
+        batch = Batch(src=b[0], tgt=b[1], pad_idx=pad_idx)
         for it in range(len(batch)):
             idx += 1
             # I want to be able to get samples from any index from the database,

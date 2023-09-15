@@ -149,7 +149,7 @@ def model_predictions_review():
 def tokenization_review_dashboard():
     st.markdown("### Tokenization method:\n" "**n_dstart_bins    n_duration_bins    n_velocity_bins**")
     bins = st.text_input(label="bins", value="3 3 3")
-    dataset_cfg = OmegaConf.create({"dataset_name": "roszcz/maestro-v1", "bins": bins, "sequence_size": 128})
+    dataset_cfg = OmegaConf.create({"dataset_name": "roszcz/maestro-v1-sustain", "bins": bins, "sequence_size": 128})
 
     dataset = load_cached_dataset(dataset_cfg)
     bins = bins.replace(" ", "-")
