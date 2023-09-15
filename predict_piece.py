@@ -86,16 +86,9 @@ def predict_piece_dashboard(cfg: DictConfig):
 
     piece.source["midi_filename"] = midi_filename
 
-<<<<<<< HEAD
     source = torch.Tensor([])
     predicted_tokens = []
     idx = 0
-    # I use batches here, because it is easier to evaluate predictions that way
-=======
-    predicted_piece_df = piece.df.copy()
-    predicted_tokens = []
-    idx = 0
->>>>>>> master
     for record in tqdm(dataset):
         idx += 1
         if idx % 2 == 0:
@@ -115,10 +108,8 @@ def predict_piece_dashboard(cfg: DictConfig):
 
         out_tokens = [dataset.tgt_vocab[x] for x in decoded if x != pad_idx]
         predicted_tokens += out_tokens
-<<<<<<< HEAD
+
         source = torch.concat([source, record[0]]).type_as(record[0].data)
-=======
->>>>>>> master
 
         target = record[1][1:-1].to(dev)
         n_tokens = (target != pad_idx).data.sum()
@@ -126,7 +117,6 @@ def predict_piece_dashboard(cfg: DictConfig):
         total_loss += loss.item()
         total_dist += avg_distance(out, target).cpu()
 
-<<<<<<< HEAD
     source_tokens = [dataset.src_vocab[x] for x in source]
     pred_df = dataset.tokenizer_tgt.untokenize(predicted_tokens)
     src_df = dataset.tokenizer_src.untokenize(source_tokens)
@@ -144,10 +134,6 @@ def predict_piece_dashboard(cfg: DictConfig):
         # make df like an original but with predicted dstart
         predicted_piece_df[["velocity", "duration"]] = piece.df[["velocity", "duration"]].copy()
         predicted_piece_df["end"] = predicted_piece_df["start"] + predicted_piece_df["duration"]
-=======
-    pred_velocities = dataset.tokenizer_tgt.untokenize(predicted_tokens)
-    predicted_piece_df = predicted_piece_df.head(len(pred_velocities))
->>>>>>> master
 
     predicted_piece = MidiPiece(predicted_piece_df)
 

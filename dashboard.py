@@ -211,7 +211,7 @@ def tokenization_review_dashboard(cfg):
 def prepare_model_and_dataset_from_checkpoint(
     checkpoint: dict,
     cfg: DictConfig,
-) -> tuple[torch.nn.Module, BinsToVelocityDataset]:
+) -> tuple[torch.nn.Module, TokenizedMidiDataset]:
     train_cfg = OmegaConf.create(checkpoint["cfg"])
     dataset_name = cfg.dataset.dataset_name
     if dataset_name is None:
