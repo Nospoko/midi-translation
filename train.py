@@ -46,6 +46,7 @@ def save_checkpoint(
         },
         path,
     )
+    print(cfg.run_name)
 
 
 def load_datasets(cfg: DictConfig) -> tuple[BinsToVelocityDataset, BinsToVelocityDataset]:

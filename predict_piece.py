@@ -4,6 +4,7 @@ import hydra
 import torch
 import pandas as pd
 import streamlit as st
+from hydra.core.global_hydra import GlobalHydra
 from tqdm import tqdm
 from fortepyan import MidiPiece
 from datasets import load_dataset
@@ -67,6 +68,7 @@ def predict_piece_dashboard(cfg: DictConfig):
     )
     model.load_state_dict(checkpoint["model_state_dict"])
     model.to(dev)
+
     pad_idx = dataset.tgt_vocab.index("<blank>")
 
     criterion = LabelSmoothing(
@@ -78,8 +80,6 @@ def predict_piece_dashboard(cfg: DictConfig):
 
     total_loss = 0
     total_dist = 0
-
-    dev = torch.device(dev)
 
     piece = MidiPiece.from_huggingface(one_record_dataset[0])
 
@@ -135,6 +135,7 @@ def predict_piece_dashboard(cfg: DictConfig):
     avg_dist = 2 * total_dist / len(dataset)
     predicted_piece.source["average_loss"] = f"{avg_loss:6.2f}"
     predicted_piece.source["average_dist"] = f"{avg_dist:6.2f}"
+
     print(f"{avg_loss:6.2f}, {avg_dist:6.2f}")
 
     with cols[0]:
@@ -151,8 +152,10 @@ def predict_piece_dashboard(cfg: DictConfig):
 
 @hydra.main(version_base=None, config_path="config", config_name="dashboard_conf")
 def main(cfg):
+    GlobalHydra.instance().clear()
     predict_piece_dashboard(cfg)
 
 
 if __name__ == "__main__":
     main()
+

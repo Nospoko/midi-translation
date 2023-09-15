@@ -100,11 +100,11 @@ When you have trained your model, you can listen to and compare model prediction
 Run the same command and choose "Model predictions" option.
 ![image](https://github.com/Nospoko/midi-translation/assets/74838859/65422b01-b91c-40b4-a592-70e7e6c8986f)
 
-
 #### Predict piece
 
 You can choose a model to predict velocities of any piece from test dataset.
 ![image](https://github.com/Nospoko/midi-translation/assets/74838859/d8a1f536-26d1-4eb1-9393-2f0353e76cd9)
+
 
 ### Eval
 
