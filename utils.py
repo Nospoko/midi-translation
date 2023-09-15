@@ -104,7 +104,7 @@ def load_cached_dataset(
     return dataset
 
 
-def process_record(record, dataset: TokenizedMidiDataset, model, cfg, train_cfg):
+def predict_sample(record, dataset: TokenizedMidiDataset, model, cfg, train_cfg):
     pad_idx = dataset.tgt_vocab.index("<blank>")
     src_mask = (record[0] != pad_idx).unsqueeze(-2)
 
