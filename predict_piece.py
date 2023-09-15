@@ -90,31 +90,38 @@ def predict_piece_dashboard(cfg: DictConfig):
 
     predicted_piece_df = piece.df.copy()
     predicted = torch.Tensor([]).to(dev)
+    predicted_tokens = []
     idx = 0
-    for b in tqdm(dataloader):
+    for record in tqdm(dataset):
         idx += 1
         if idx % 2 == 0:
             continue
-        batch = Batch(b[0], b[1], pad=pad_idx)
-        batch.to(dev)
-        sequence = greedy_decode(
+
+        pad_idx = dataset.tgt_vocab.index("<blank>")
+        src_mask = (record[0] != pad_idx).unsqueeze(-2)
+
+        decoded, out = decode_and_output(
             model=model,
-            src=batch.src[0],
-            src_mask=batch.src_mask[0],
+            src=record[0],
+            src_mask=src_mask[0],
             max_len=train_cfg.dataset.sequence_size,
             start_symbol=0,
             device=cfg.device,
         )
-        predicted = torch.concat([predicted, sequence[1:]]).type_as(sequence.data)
 
-        encoded_decoded = model.forward(batch.src, batch.tgt, batch.src_mask, batch.tgt_mask)
-        out = model.generator(encoded_decoded)
+        out_tokens = [dataset.tgt_vocab[x] for x in decoded if x != pad_idx]
+        predicted_tokens += out_tokens
+        source = torch.concat([source, record[0]]).type_as(record[0].data)
 
-        out_rearranged = einops.rearrange(out, "b n d -> (b n) d")
-        target = einops.rearrange(batch.tgt_y, "b n -> (b n)")
-        loss = criterion(out_rearranged, target) / batch.ntokens
+        target = record[1][1:-1].to(dev)
+        n_tokens = (target != pad_idx).data.sum()
+        loss = criterion(out, target) / n_tokens
         total_loss += loss.item()
-        total_dist += avg_distance(out_rearranged, target).cpu()
+        total_dist += avg_distance(out, target).cpu()
+
+    source_tokens = [dataset.src_vocab[x] for x in source]
+    pred_df = dataset.tokenizer_tgt.untokenize(predicted_tokens)
+    src_df = dataset.tokenizer_src.untokenize(source_tokens)
 
     predicted = [dataset.tgt_vocab[x] for x in predicted]
     pred_velocities = dataset.tokenizer_tgt.untokenize(predicted)
