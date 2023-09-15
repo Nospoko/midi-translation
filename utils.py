@@ -96,7 +96,7 @@ def load_cached_dataset(
 
         file.close()
 
-    except (EOFError, ConnectionError):
+    except (EOFError, ConnectionError, UnboundLocalError):
         file.close()
         os.remove(path=dataset_cache_path)
         dataset = load_cached_dataset(cfg, split)

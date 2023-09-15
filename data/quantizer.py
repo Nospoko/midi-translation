@@ -1,8 +1,3 @@
-"""
-MidiQuantizer by JasiekKaczmarczyk
-from https://github.com/Nospoko/midi-clip/blob/MIDI-44/midi-clip/data/quantizer.py
-"""
-
 import yaml
 import numpy as np
 import pandas as pd

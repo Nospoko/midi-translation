@@ -13,10 +13,9 @@ from hydra.core.global_hydra import GlobalHydra
 
 from model import make_model
 from evals.evaluate import load_cached_dataset
-from utils import piece_av_files, process_record
+from utils import piece_av_files, predict_sample
 from predict_piece import predict_piece_dashboard
 from data.dataset import BinsToDstartDataset, TokenizedMidiDataset, BinsToVelocityDataset
-
 
 @hydra.main(version_base=None, config_path="config", config_name="dashboard_conf")
 def main(cfg: DictConfig):
@@ -58,25 +57,8 @@ def model_predictions_review(cfg: DictConfig):
         st.markdown("### Q. column")
     with cols[3]:
         st.markdown("### Predicted")
-    dataset_name = train_cfg.dataset.dataset_name
-    if dataset_name is None:
-        dataset = load_cached_dataset(train_cfg.dataset)
-    else:
-        cfg.dataset = train_cfg.dataset
-        cfg.dataset.dataset_name = dataset_name
-        dataset = load_cached_dataset(cfg.dataset, split=cfg.dataset_split)
 
-    model = make_model(
-        input_size=len(dataset.src_vocab),
-        output_size=len(dataset.tgt_vocab),
-        n=train_cfg.model.n,
-        d_model=train_cfg.model.d_model,
-        d_ff=train_cfg.model.d_ff,
-        h=train_cfg.model.h,
-        dropout=train_cfg.model.dropout,
-    )
-    model.load_state_dict(checkpoint["model_state_dict"])
-    model.to(cfg.device)
+    model, dataset = prepare_model_and_dataset_from_checkpoint(checkpoint, cfg)
 
     n_samples = 5
     idxs = np.random.randint(len(dataset), size=n_samples)
@@ -90,7 +72,7 @@ def model_predictions_review(cfg: DictConfig):
     # predict velocities and get src, tgt and model output
     print("Making predictions ...")
     for record, sample, idx in zip(records, samples, idxs):
-        result = process_record(
+        result = predict_sample(
             record=sample,
             dataset=dataset,
             model=model,
@@ -226,6 +208,34 @@ def tokenization_review_dashboard(cfg):
             st.table(quantized_piece.source)
 
 
+def prepare_model_and_dataset_from_checkpoint(
+    checkpoint: dict,
+    cfg: DictConfig,
+) -> tuple[torch.nn.Module, BinsToVelocityDataset]:
+    train_cfg = OmegaConf.create(checkpoint["cfg"])
+    dataset_name = cfg.dataset.dataset_name
+    if dataset_name is None:
+        dataset = load_cached_dataset(train_cfg.dataset)
+    else:
+        cfg.dataset = train_cfg.dataset
+        cfg.dataset.dataset_name = dataset_name
+        dataset = load_cached_dataset(cfg.dataset, split=cfg.dataset_split)
+
+    model = make_model(
+        input_size=len(dataset.src_vocab),
+        output_size=len(dataset.tgt_vocab),
+        n=train_cfg.model.n,
+        d_model=train_cfg.model.d_model,
+        d_ff=train_cfg.model.d_ff,
+        h=train_cfg.model.h,
+        dropout=train_cfg.model.dropout,
+    )
+    model.load_state_dict(checkpoint["model_state_dict"])
+    model.to(cfg.device)
+
+    return model, dataset
+
+
 def prepare_midi_pieces(
     record: dict, processed: dict, idx: int, dataset: TokenizedMidiDataset, bins: str = "3-3-3"
 ) -> tuple[MidiPiece, MidiPiece]:
@@ -236,8 +246,6 @@ def prepare_midi_pieces(
     quantized_notes = dataset.quantizer.apply_quantization(processed_df)
     # we have to pop midi_filename column
     filename = notes.pop("midi_filename")[0]
-    # print(filename)
-    # title, composer = get_sample_info(dataset=dataset, midi_filename=filename)
 
     start_time = np.min(notes["start"])
 
@@ -254,16 +262,12 @@ def prepare_midi_pieces(
 
     name = f"{filename.split('.')[0].replace('/', '-')}-{idx}-real-{bins}-{dataset.sequence_len}"
     piece.source["midi_filename"] = f"tmp/dashboard/common/{name}.mid"
-    # piece.source["title"] = title
-    # piece.source["composer"] = composer
 
     quantized_piece = MidiPiece(quantized_notes)
 
     name = f"{filename.split('.')[0].replace('/', '-')}-{idx}-quantized-{bins}-{dataset.sequence_len}"
     quantized_piece.source = piece.source.copy()
     quantized_piece.source["midi_filename"] = f"tmp/dashboard/common/{name}.mid"
-    # quantized_piece.source["title"] = title
-    # quantized_piece.source["composer"] = composer
 
     return piece, quantized_piece
 

@@ -41,10 +41,14 @@ mark a significant stride toward the realm of emotionally resonant AI music gene
 ### Data Preprocessing
 #### MIDI data
 MIDI data describes notes by 5 features:
+<<<<<<< HEAD
    1. Pitch - Represented as a number between 0 and 127 (or 21 to 108 for piano keys, reflecting the
+=======
+   1. Pitch - represented as a number between 0 and 127 (or 21 to 108 for piano keys, reflecting the
+>>>>>>> master
    standard 88-key keyboard).
-   2. Start - Indicates the moment a key is pressed, measured in seconds.
-   3. End - Marks the second when the key is released.
+   2. Start - indicates the moment a key is pressed, measured in seconds.
+   3. End - marks the second when the key is released.
    4. Duration - calculated as the time elapsed between the key's press and release.
    5. Velocity - ranging from 0 to 128, indicating the intensity of the key press.
 
@@ -54,7 +58,7 @@ we first engineered a more suitable representation of the notes:
 
 1. Pitch - same as above.
 2. Dstart - time elapsed after start of previous note.
-3. Duration - same as above,
+3. Duration - same as above.
 4. Velocity - same as above.
 
 We extracted 128-note samples which we quantized using 3 bins for dstart, 3 for duration and 3 for velocity.
@@ -101,7 +105,7 @@ The important hyperparameters:
 - Number of layers in encoder and decoder: **6**
 - Nuber of heads in attention layers: **8**
 - Dimension of encoder and decoder outputs: **512**
-- Dimension of a hidden layer of position-wise fast-forward network from each layer of encoder and decoder: **2048**
+- Dimension of a hidden layer of position-wise feed-forward network from each layer of encoder and decoder: **2048**
 
 
 ### Training and Evaluation

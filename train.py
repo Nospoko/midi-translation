@@ -27,7 +27,13 @@ def main(cfg: DictConfig):
     print(cfg.run_name)
 
 
-def save_checkpoint(model: nn.Module, optimizer: torch.optim.Optimizer, cfg: DictConfig):
+def save_checkpoint(
+    model: nn.Module,
+    optimizer: torch.optim.Optimizer,
+    cfg: DictConfig,
+    input_size: int,
+    output_size: int,
+):
     bins = "-".join(cfg.dataset.bins.split(" "))
     path = f"models/{bins}-{cfg.file_prefix}-{cfg.run_name}.pt"
     torch.save(
@@ -35,9 +41,12 @@ def save_checkpoint(model: nn.Module, optimizer: torch.optim.Optimizer, cfg: Dic
             "model_state_dict": model.state_dict(),
             "optimizer": optimizer.state_dict(),
             "cfg": OmegaConf.to_object(cfg),
+            "input_size": input_size,
+            "output_size": output_size,
         },
         path,
     )
+    print(cfg.run_name)
 
 
 def load_datasets(cfg: DictConfig) -> tuple[TokenizedMidiDataset, TokenizedMidiDataset]:
@@ -127,7 +136,7 @@ def train_model(
             )
             print(float(v_loss), float(v_dist))
             if v_loss <= best_test_loss:
-                save_checkpoint(model, optimizer, cfg)
+                save_checkpoint(model, optimizer, cfg, vocab_src_size, vocab_tgt_size)
                 best_test_loss = v_loss
 
         # Log validation and training losses

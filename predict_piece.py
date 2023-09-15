@@ -5,6 +5,7 @@ import hydra
 import torch
 import pandas as pd
 import streamlit as st
+from hydra.core.global_hydra import GlobalHydra
 from tqdm import tqdm
 from fortepyan import MidiPiece
 from datasets import load_dataset
@@ -46,6 +47,7 @@ def predict_piece_dashboard(cfg: DictConfig):
         with st.sidebar:
             midi_filename = st.selectbox(label="piece", options=[filename for filename in hf_dataset["midi_filename"]])
         one_record_dataset = hf_dataset.filter(lambda x: x["midi_filename"] == midi_filename)
+
     dataset = eval(train_cfg.dataset.dataset_class)(
         dataset=one_record_dataset,
         n_dstart_bins=eval(n_dstart_bins),
@@ -67,6 +69,7 @@ def predict_piece_dashboard(cfg: DictConfig):
     )
     model.load_state_dict(checkpoint["model_state_dict"])
     model.to(dev)
+
     pad_idx = dataset.tgt_vocab.index("<blank>")
 
     criterion = LabelSmoothing(
@@ -80,12 +83,19 @@ def predict_piece_dashboard(cfg: DictConfig):
     total_dist = 0
 
     piece = MidiPiece.from_huggingface(one_record_dataset[0])
+
     piece.source["midi_filename"] = midi_filename
 
+<<<<<<< HEAD
     source = torch.Tensor([])
     predicted_tokens = []
     idx = 0
     # I use batches here, because it is easier to evaluate predictions that way
+=======
+    predicted_piece_df = piece.df.copy()
+    predicted_tokens = []
+    idx = 0
+>>>>>>> master
     for record in tqdm(dataset):
         idx += 1
         if idx % 2 == 0:
@@ -105,7 +115,10 @@ def predict_piece_dashboard(cfg: DictConfig):
 
         out_tokens = [dataset.tgt_vocab[x] for x in decoded if x != pad_idx]
         predicted_tokens += out_tokens
+<<<<<<< HEAD
         source = torch.concat([source, record[0]]).type_as(record[0].data)
+=======
+>>>>>>> master
 
         target = record[1][1:-1].to(dev)
         n_tokens = (target != pad_idx).data.sum()
@@ -113,6 +126,7 @@ def predict_piece_dashboard(cfg: DictConfig):
         total_loss += loss.item()
         total_dist += avg_distance(out, target).cpu()
 
+<<<<<<< HEAD
     source_tokens = [dataset.src_vocab[x] for x in source]
     pred_df = dataset.tokenizer_tgt.untokenize(predicted_tokens)
     src_df = dataset.tokenizer_src.untokenize(source_tokens)
@@ -130,8 +144,13 @@ def predict_piece_dashboard(cfg: DictConfig):
         # make df like an original but with predicted dstart
         predicted_piece_df[["velocity", "duration"]] = piece.df[["velocity", "duration"]].copy()
         predicted_piece_df["end"] = predicted_piece_df["start"] + predicted_piece_df["duration"]
+=======
+    pred_velocities = dataset.tokenizer_tgt.untokenize(predicted_tokens)
+    predicted_piece_df = predicted_piece_df.head(len(pred_velocities))
+>>>>>>> master
 
     predicted_piece = MidiPiece(predicted_piece_df)
+
     predicted_piece.source = piece.source.copy()
 
     model_dir = f"tmp/dashboard/{train_cfg.run_name}"
@@ -141,6 +160,7 @@ def predict_piece_dashboard(cfg: DictConfig):
     midi_filename = midi_filename.split(".")[0].replace("/", "-")
     predicted_piece.source["midi_filename"] = f"tmp/dashboard/{train_cfg.run_name}/{midi_filename}-pred.mid"
     piece.source["midi_filename"] = f"tmp/dashboard/common/{midi_filename}.mid"
+
     pred_paths = piece_av_files(predicted_piece)
     paths = piece_av_files(piece)
 
@@ -151,6 +171,7 @@ def predict_piece_dashboard(cfg: DictConfig):
     avg_dist = 2 * total_dist / len(dataset)
     predicted_piece.source["average_loss"] = f"{avg_loss:6.2f}"
     predicted_piece.source["average_dist"] = f"{avg_dist:6.2f}"
+
     print(f"{avg_loss:6.2f}, {avg_dist:6.2f}")
 
     with cols[0]:
@@ -167,8 +188,10 @@ def predict_piece_dashboard(cfg: DictConfig):
 
 @hydra.main(version_base=None, config_path="config", config_name="dashboard_conf")
 def main(cfg):
+    GlobalHydra.instance().clear()
     predict_piece_dashboard(cfg)
 
 
 if __name__ == "__main__":
     main()
+
