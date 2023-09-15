@@ -82,40 +82,37 @@ def predict_piece_dashboard(cfg: DictConfig):
     total_loss = 0
     total_dist = 0
 
-    dev = torch.device(dev)
-    dataloader = DataLoader(dataset, batch_size=1)
-
     piece = MidiPiece.from_huggingface(one_record_dataset[0])
     piece.source["midi_filename"] = midi_filename
 
-    source = torch.Tensor([]).to(dev)
+    source = torch.Tensor([])
     predicted_tokens = []
     idx = 0
     # I use batches here, because it is easier to evaluate predictions that way
-    for b in tqdm(dataloader):
+    for record in tqdm(dataset):
         idx += 1
         if idx % 2 == 0:
             continue
-        batch = Batch(b[0], b[1], pad=pad_idx)
-        batch.to(dev)
 
         pad_idx = dataset.tgt_vocab.index("<blank>")
+        src_mask = (record[0] != pad_idx).unsqueeze(-2)
 
         decoded, out = decode_and_output(
             model=model,
-            src=batch.src[0],
-            src_mask=batch.src_mask[0],
-            max_len=train_cfg.dataset.sequence_size + 1,
+            src=record[0],
+            src_mask=src_mask[0],
+            max_len=train_cfg.dataset.sequence_size,
             start_symbol=0,
             device=cfg.device,
         )
 
         out_tokens = [dataset.tgt_vocab[x] for x in decoded if x != pad_idx]
         predicted_tokens += out_tokens
-        source = torch.concat([source, batch.src[0]]).type_as(batch.src[0].data)
+        source = torch.concat([source, record[0]]).type_as(record[0].data)
 
-        target = einops.rearrange(batch.tgt_y, "b n -> (b n)")
-        loss = criterion(out, target) / batch.ntokens
+        target = record[1][1:-1].to(dev)
+        n_tokens = (target != pad_idx).data.sum()
+        loss = criterion(out, target)/ n_tokens
         total_loss += loss.item()
         total_dist += avg_distance(out, target).cpu()
 
