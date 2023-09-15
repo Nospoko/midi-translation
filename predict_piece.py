@@ -3,19 +3,16 @@ import glob
 
 import hydra
 import torch
-import einops
 import pandas as pd
 import streamlit as st
 from tqdm import tqdm
 from fortepyan import MidiPiece
 from datasets import load_dataset
-from torch.utils.data import DataLoader
 from omegaconf import OmegaConf, DictConfig
 
-from data.batch import Batch
 from model import make_model
 from modules.label_smoothing import LabelSmoothing
-from utils import avg_distance, piece_av_files, process_record, greedy_decode, decode_and_output
+from utils import avg_distance, piece_av_files, decode_and_output
 from data.dataset import BinsToDstartDataset, BinsToVelocityDataset
 
 
@@ -112,7 +109,7 @@ def predict_piece_dashboard(cfg: DictConfig):
 
         target = record[1][1:-1].to(dev)
         n_tokens = (target != pad_idx).data.sum()
-        loss = criterion(out, target)/ n_tokens
+        loss = criterion(out, target) / n_tokens
         total_loss += loss.item()
         total_dist += avg_distance(out, target).cpu()
 

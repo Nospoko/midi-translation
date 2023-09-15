@@ -148,7 +148,7 @@ def greedy_decode(
 
 
 def decode_and_output(
-model: nn.Module, src: torch.Tensor, src_mask: torch.Tensor, max_len: int, start_symbol: int, device: str = "cpu"
+    model: nn.Module, src: torch.Tensor, src_mask: torch.Tensor, max_len: int, start_symbol: int, device: str = "cpu"
 ) -> tuple[torch.Tensor, torch.Tensor]:
     dev = torch.device(device)
     # Pretend to be batches
