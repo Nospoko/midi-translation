@@ -59,7 +59,6 @@ device: "cpu"
 warmup: 3000
 log_frequency: 10
 file_prefix: "to_vel"
-model_path: "to_vel_final.pt"
 run_name: midi-transformer-${now:%Y-%m-%d-%H-%M}
 project: "midi-transformer"
 

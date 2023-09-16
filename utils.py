@@ -101,17 +101,23 @@ def load_cached_dataset(dataset_cfg: DictConfig, split="test") -> BinsToVelocity
     return dataset
 
 
-def predict_sample(record, dataset: BinsToVelocityDataset, model, cfg, train_cfg) -> list[str]:
+def predict_sample(
+    src_tokens: torch.Tensor,
+    dataset: BinsToVelocityDataset,
+    model: nn.Module,
+    sequence_size: int,
+    device: str = "cpu",
+) -> list[str]:
     pad_idx = dataset.tgt_vocab.index("<blank>")
-    src_mask = (record[0] != pad_idx).unsqueeze(-2)
+    src_mask = (src_tokens != pad_idx).unsqueeze(-2)
 
     sequence = greedy_decode(
         model=model,
-        src=record[0],
+        src=src_tokens,
         src_mask=src_mask,
-        max_len=train_cfg.dataset.sequence_size,
+        max_len=sequence_size,
         start_symbol=0,
-        device=cfg.device,
+        device=device,
     )
 
     out_tokens = [dataset.tgt_vocab[x] for x in sequence if x != pad_idx]

@@ -7,14 +7,14 @@ import numpy as np
 import pandas as pd
 import streamlit as st
 from fortepyan import MidiPiece
-from omegaconf import OmegaConf, DictConfig
+from omegaconf import OmegaConf
 from hydra.core.global_hydra import GlobalHydra
 
 from model import make_model
 from data.dataset import BinsToVelocityDataset
 from evals.evaluate import load_cached_dataset
-from utils import piece_av_files, predict_sample
 from predict_piece import predict_piece_dashboard
+from utils import piece_av_files, predict_sample, vocab_sizes
 
 
 # For now let's run all dashboards on CPU
@@ -46,9 +46,10 @@ def model_predictions_review():
         st.markdown("Selected checkpoint:")
         st.markdown(path)
 
-    # load checkpoint
+    # load checkpoint, force dashboard device
     checkpoint = torch.load(path, map_location=DEVICE)
     train_cfg = OmegaConf.create(checkpoint["cfg"])
+    train_cfg.device = DEVICE
 
     st.markdown("Model config:")
     model_params = OmegaConf.to_container(train_cfg.model)
@@ -58,8 +59,32 @@ def model_predictions_review():
     st.markdown("Dataset config:")
     st.json(dataset_params, expanded=True)
 
-    cols = st.columns(4)
+    dataset_cfg = train_cfg.dataset
+    dataset_name = st.text_input(label="dataset", value=dataset_cfg.dataset_name)
+    split = st.text_input(label="split", value="test")
 
+    dataset_cfg.dataset_name = dataset_name
+    dataset = load_cached_dataset(dataset_cfg=dataset_cfg, split=split)
+    src_vocab_size, tgt_vocab_size = vocab_sizes(train_cfg)
+
+    model = make_model(
+        src_vocab_size=src_vocab_size,
+        tgt_vocab_size=tgt_vocab_size,
+        n=train_cfg.model.n,
+        d_model=train_cfg.model.d_model,
+        d_ff=train_cfg.model.d_ff,
+        h=train_cfg.model.h,
+        dropout=train_cfg.model.dropout,
+    )
+    model.load_state_dict(checkpoint["model_state_dict"])
+    model.to(DEVICE)
+
+    n_samples = 5
+    idxs = np.random.randint(len(dataset), size=n_samples)
+
+    pad_idx = dataset.tgt_vocab.index("<blank>")
+
+    cols = st.columns(4)
     with cols[0]:
         st.markdown("### Unchanged")
     with cols[1]:
@@ -69,39 +94,33 @@ def model_predictions_review():
     with cols[3]:
         st.markdown("### Predicted")
 
-    return
-
-    model, dataset = prepare_model_and_dataset_from_checkpoint(checkpoint)
-
-    n_samples = 5
-    idxs = np.random.randint(len(dataset), size=n_samples)
-
-    records = [dataset.records[idx] for idx in idxs]
-    samples = [dataset[idx] for idx in idxs]
-
-    pad_idx = dataset.tgt_vocab.index("<blank>")
-    bins = train_cfg.dataset.bins.replace(" ", "-")
-
     # predict velocities and get src, tgt and model output
     print("Making predictions ...")
-    for record, sample, idx in zip(records, samples, idxs):
+    for record_id in idxs:
+        record = dataset.records[record_id]
+        record_tokens = dataset[record_id]
+
+        src_tokens = record_tokens[0]
         result = predict_sample(
-            record=sample,
-            dataset=dataset,
             model=model,
-            train_cfg=train_cfg,
+            dataset=dataset,
+            src_tokens=src_tokens,
+            sequence_size=train_cfg.dataset.sequence_size,
         )
-        src = [dataset.src_vocab[x] for x in sample[0] if x != pad_idx]
-        # tgt = [dataset.tgt_vocab[x] for x in sample[1] if x != pad_idx]
-        out = result
+        src = [dataset.src_vocab[x] for x in src_tokens if x != pad_idx]
         record["source"] = json.loads(record["source"])
 
         source = dataset.tokenizer_src.untokenize(src)
-        predicted = dataset.tokenizer_tgt.untokenize(out)
+        predicted = dataset.tokenizer_tgt.untokenize(result)
 
         filename = record["midi_filename"]
 
-        true_piece, src_piece = prepare_midi_pieces(record, source, idx=idx, dataset=dataset, bins=bins)
+        true_piece, src_piece = prepare_midi_pieces(
+            record=record,
+            processed=source,
+            idx=record_id,
+            dataset=dataset,
+        )
         pred_piece_df = true_piece.df.copy()
         quantized_vel_df = true_piece.df.copy()
 
@@ -124,11 +143,11 @@ def model_predictions_review():
 
         directory = "tmp/dashboard/"
 
-        name = f"{filename.split('.')[0].replace('/', '-')}-{idx}"
+        name = f"{filename.split('.')[0].replace('/', '-')}-{record_id}"
         pred_piece.source = true_piece.source.copy()
         pred_piece.source["midi_filename"] = model_dir + "/" + name + ".mid"
 
-        name = f"{filename.split('.')[0].replace('/', '-')}-{idx}-qv-{bins}-{dataset.sequence_len}"
+        name = f"{filename.split('.')[0].replace('/', '-')}-{record_id}-qv-{dataset.sequence_len}"
         quantized_vel_piece.source = true_piece.source.copy()
         quantized_vel_piece.source["midi_filename"] = directory + "common/" + name + ".mid"
 
@@ -166,7 +185,7 @@ def tokenization_review_dashboard():
     bins = st.text_input(label="bins", value="3 3 3")
     dataset_cfg = OmegaConf.create({"dataset_name": "roszcz/maestro-v1-sustain", "bins": bins, "sequence_size": 128})
 
-    dataset = load_cached_dataset(dataset_cfg)
+    dataset = load_cached_dataset(dataset_cfg=dataset_cfg)
     bins = bins.replace(" ", "-")
 
     n_samples = 5
@@ -183,7 +202,6 @@ def tokenization_review_dashboard():
             processed=dataset.records[idx],
             idx=idx,
             dataset=dataset,
-            bins=bins,
         )
 
         paths = piece_av_files(piece)
@@ -200,41 +218,11 @@ def tokenization_review_dashboard():
             st.table(quantized_piece.source)
 
 
-def prepare_model_and_dataset_from_checkpoint(
-    checkpoint: dict,
-    dashboard_cfg: DictConfig,
-) -> tuple[torch.nn.Module, BinsToVelocityDataset]:
-    train_cfg = OmegaConf.create(checkpoint["cfg"])
-    dataset_name = dashboard_cfg.dataset.dataset_name
-
-    if dataset_name is None:
-        dataset = load_cached_dataset(train_cfg.dataset)
-    else:
-        dashboard_cfg.dataset = train_cfg.dataset
-        dashboard_cfg.dataset.dataset_name = dataset_name
-        dataset = load_cached_dataset(dashboard_cfg.dataset, split=dashboard_cfg.dataset_split)
-
-    model = make_model(
-        input_size=len(dataset.src_vocab),
-        output_size=len(dataset.tgt_vocab),
-        n=train_cfg.model.n,
-        d_model=train_cfg.model.d_model,
-        d_ff=train_cfg.model.d_ff,
-        h=train_cfg.model.h,
-        dropout=train_cfg.model.dropout,
-    )
-    model.load_state_dict(checkpoint["model_state_dict"])
-    model.to(DEVICE)
-
-    return model, dataset
-
-
 def prepare_midi_pieces(
     record: dict,
     processed: dict,
     idx: int,
     dataset: BinsToVelocityDataset,
-    bins: str = "3-3-3",
 ) -> tuple[MidiPiece, MidiPiece]:
     # get dataframes with notes
     processed_df = pd.DataFrame(processed)
@@ -255,12 +243,12 @@ def prepare_midi_pieces(
 
     # create MidiPieces
     piece = MidiPiece(notes)
-    name = f"{filename.split('.')[0].replace('/', '-')}-{idx}-real-{bins}-{dataset.sequence_len}"
+    name = f"{filename.split('.')[0].replace('/', '-')}-{idx}-real-{dataset.sequence_len}"
     piece.source = piece_source
     piece.source["midi_filename"] = f"tmp/dashboard/common/{name}.mid"
 
     quantized_piece = MidiPiece(quantized_notes)
-    name = f"{filename.split('.')[0].replace('/', '-')}-{idx}-quantized-{bins}-{dataset.sequence_len}"
+    name = f"{filename.split('.')[0].replace('/', '-')}-{idx}-quantized-{dataset.sequence_len}"
     quantized_piece.source = piece.source.copy()
     quantized_piece.source["midi_filename"] = f"tmp/dashboard/common/{name}.mid"
 
