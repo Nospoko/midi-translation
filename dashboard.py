@@ -2,7 +2,6 @@ import os
 import glob
 import json
 
-import hydra
 import torch
 import numpy as np
 import pandas as pd
@@ -18,16 +17,20 @@ from utils import piece_av_files, predict_sample
 from predict_piece import predict_piece_dashboard
 
 
-@hydra.main(version_base=None, config_path="config", config_name="dashboard_conf")
-def main(cfg: DictConfig):
+# For now let's run all dashboards on CPU
+DEVICE = "cpu"
+
+
+def main():
     with st.sidebar:
         mode = st.selectbox(label="Display", options=["Model predictions", "Predict piece", "Tokenization review"])
+
     if mode == "Tokenization review":
         tokenization_review_dashboard()
     if mode == "Predict piece":
-        predict_piece_dashboard(cfg)
+        predict_piece_dashboard()
     if mode == "Model predictions":
-        model_predictions_review(cfg)
+        model_predictions_review()
 
 
 def get_sample_info(dataset: BinsToVelocityDataset, midi_filename: str):
@@ -36,17 +39,24 @@ def get_sample_info(dataset: BinsToVelocityDataset, midi_filename: str):
     return title, composer
 
 
-def model_predictions_review(cfg: DictConfig):
+def model_predictions_review():
     with st.sidebar:
         # options
         path = st.selectbox(label="model", options=glob.glob("models/*.pt"))
+        st.markdown("Selected checkpoint:")
+        st.markdown(path)
 
     # load checkpoint
-    checkpoint = torch.load(path, map_location=cfg.device)
-    params = pd.DataFrame(checkpoint["cfg"]["model"], index=[0])
+    checkpoint = torch.load(path, map_location=DEVICE)
     train_cfg = OmegaConf.create(checkpoint["cfg"])
-    st.markdown("Model parameters:")
-    st.table(params)
+
+    st.markdown("Model config:")
+    model_params = OmegaConf.to_container(train_cfg.model)
+    st.json(model_params, expanded=False)
+
+    dataset_params = OmegaConf.to_container(train_cfg.dataset)
+    st.markdown("Dataset config:")
+    st.json(dataset_params, expanded=True)
 
     cols = st.columns(4)
 
@@ -59,7 +69,9 @@ def model_predictions_review(cfg: DictConfig):
     with cols[3]:
         st.markdown("### Predicted")
 
-    model, dataset = prepare_model_and_dataset_from_checkpoint(checkpoint, cfg)
+    return
+
+    model, dataset = prepare_model_and_dataset_from_checkpoint(checkpoint)
 
     n_samples = 5
     idxs = np.random.randint(len(dataset), size=n_samples)
@@ -77,7 +89,6 @@ def model_predictions_review(cfg: DictConfig):
             record=sample,
             dataset=dataset,
             model=model,
-            cfg=cfg,
             train_cfg=train_cfg,
         )
         src = [dataset.src_vocab[x] for x in sample[0] if x != pad_idx]
@@ -191,16 +202,17 @@ def tokenization_review_dashboard():
 
 def prepare_model_and_dataset_from_checkpoint(
     checkpoint: dict,
-    cfg: DictConfig,
+    dashboard_cfg: DictConfig,
 ) -> tuple[torch.nn.Module, BinsToVelocityDataset]:
     train_cfg = OmegaConf.create(checkpoint["cfg"])
-    dataset_name = cfg.dataset.dataset_name
+    dataset_name = dashboard_cfg.dataset.dataset_name
+
     if dataset_name is None:
         dataset = load_cached_dataset(train_cfg.dataset)
     else:
-        cfg.dataset = train_cfg.dataset
-        cfg.dataset.dataset_name = dataset_name
-        dataset = load_cached_dataset(cfg.dataset, split=cfg.dataset_split)
+        dashboard_cfg.dataset = train_cfg.dataset
+        dashboard_cfg.dataset.dataset_name = dataset_name
+        dataset = load_cached_dataset(dashboard_cfg.dataset, split=dashboard_cfg.dataset_split)
 
     model = make_model(
         input_size=len(dataset.src_vocab),
@@ -212,13 +224,17 @@ def prepare_model_and_dataset_from_checkpoint(
         dropout=train_cfg.model.dropout,
     )
     model.load_state_dict(checkpoint["model_state_dict"])
-    model.to(cfg.device)
+    model.to(DEVICE)
 
     return model, dataset
 
 
 def prepare_midi_pieces(
-    record: dict, processed: dict, idx: int, dataset: BinsToVelocityDataset, bins: str = "3-3-3"
+    record: dict,
+    processed: dict,
+    idx: int,
+    dataset: BinsToVelocityDataset,
+    bins: str = "3-3-3",
 ) -> tuple[MidiPiece, MidiPiece]:
     # get dataframes with notes
     processed_df = pd.DataFrame(processed)

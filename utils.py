@@ -16,6 +16,15 @@ from data.dataset import BinsToVelocityDataset
 from modules.encoderdecoder import subsequent_mask
 
 
+def vocab_sizes(cfg: DictConfig) -> tuple[int, int]:
+    bins = cfg.dataset.quantization
+
+    # +3 is for special tokens we don't really use right now
+    tgt_vocab_size = 128 + 3
+    src_vocab_size = 3 + 88 * bins.dstart * bins.velocity * bins.duration
+    return src_vocab_size, tgt_vocab_size
+
+
 def piece_av_files(piece: MidiPiece) -> dict:
     # stolen from Tomek
     midi_file = piece.source["midi_filename"]
@@ -45,7 +54,7 @@ def euclidean_distance(out: torch.Tensor, tgt: torch.Tensor):
     return torch.dist(labels, tgt.to(float), p=2)
 
 
-def avg_distance(out: torch.Tensor, tgt: torch.Tensor) -> torch.Tensor:
+def calculate_average_distance(out: torch.Tensor, tgt: torch.Tensor) -> torch.Tensor:
     labels = out.argmax(1).to(float)
     # average distance between label and target
     return torch.dist(labels, tgt.to(float), p=1) / len(labels)
@@ -59,12 +68,9 @@ def learning_rate_schedule(step: int, model_size: int, factor: float, warmup: in
     return factor * (model_size ** (-0.5) * min(step ** (-0.5), step * warmup ** (-1.5)))
 
 
-def load_cached_dataset(cfg: DictConfig, split="test") -> BinsToVelocityDataset:
-    n_dstart_bins, n_duration_bins, n_velocity_bins = cfg.bins.split(" ")
-    n_dstart_bins, n_duration_bins, n_velocity_bins = int(n_dstart_bins), int(n_duration_bins), int(n_velocity_bins)
-
+def load_cached_dataset(dataset_cfg: DictConfig, split="test") -> BinsToVelocityDataset:
     config_hash = hashlib.sha256()
-    config_string = json.dumps(OmegaConf.to_container(cfg)) + split
+    config_string = json.dumps(OmegaConf.to_container(dataset_cfg)) + split
     config_hash.update(config_string.encode())
     config_hash = config_hash.hexdigest()
     cache_dir = "tmp/datasets"
@@ -78,20 +84,20 @@ def load_cached_dataset(cfg: DictConfig, split="test") -> BinsToVelocityDataset:
             dataset = pickle.load(file)
         else:
             file = open(dataset_cache_path, "wb")
-            hf_dataset = load_dataset(cfg.dataset_name, split=split)
+            hf_dataset = load_dataset(dataset_cfg.dataset_name, split=split)
             dataset = BinsToVelocityDataset(
                 dataset=hf_dataset,
-                n_dstart_bins=n_dstart_bins,
-                n_velocity_bins=n_velocity_bins,
-                n_duration_bins=n_duration_bins,
-                sequence_len=cfg.sequence_size,
+                n_dstart_bins=dataset_cfg.quantization.dstart,
+                n_velocity_bins=dataset_cfg.quantization.velocity,
+                n_duration_bins=dataset_cfg.quantization.duration,
+                sequence_len=dataset_cfg.sequence_size,
             )
             pickle.dump(dataset, file)
         file.close()
     except (EOFError, UnboundLocalError):
         file.close()
         os.remove(path=dataset_cache_path)
-        load_cached_dataset(cfg, split)
+        load_cached_dataset(dataset_cfg, split)
     return dataset
 
 

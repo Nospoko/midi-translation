@@ -39,7 +39,11 @@ class TokenizedMidiDataset:
 
         self.src_vocab, self.tgt_vocab = self.build_vocab()
 
+        # Chopp into sequences
         self.records = self._build_dataset()
+
+        # Convert into src-tgt pairs of tokens
+        self.samples = self.load_samples()
 
     def __rich_repr__(self):
         yield "TokenizedMidiDataset"

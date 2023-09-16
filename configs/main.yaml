@@ -8,10 +8,14 @@ train:
 
 dataset:
   dataset_name: 'roszcz/maestro-v1-sustain'
-  bins: "3 3 3"
   sequence_size: 128
 
-device: "cpu"
+  quantization:
+    duration: 3
+    dstart: 3
+    velocity: 3
+
+device: "cuda:0"
 warmup: 3000
 log_frequency: 10
 file_prefix: "to-vel"

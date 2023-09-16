@@ -15,12 +15,12 @@ from data.batch import Batch
 from model import make_model
 from data.dataset import BinsToVelocityDataset
 from modules.label_smoothing import LabelSmoothing
-from utils import avg_distance, load_cached_dataset, learning_rate_schedule
+from utils import calculate_average_distance, load_cached_dataset, learning_rate_schedule, vocab_sizes
 
 
-@hydra.main(version_base=None, config_path="config", config_name="conf")
+@hydra.main(version_base=None, config_path="configs", config_name="main")
 def main(cfg: DictConfig):
-    train_dataset, val_dataset = load_datasets(cfg.dataset)
+    train_dataset, val_dataset = load_datasets(dataset_cfg=cfg.dataset)
     train_model(train_dataset, val_dataset, cfg)
     print(cfg.run_name)
 
@@ -29,8 +29,6 @@ def save_checkpoint(
     model: nn.Module,
     optimizer: torch.optim.Optimizer,
     cfg: DictConfig,
-    input_size: int,
-    output_size: int,
 ):
     path = f"models/{cfg.run_name}.pt"
     torch.save(
@@ -38,17 +36,15 @@ def save_checkpoint(
             "model_state_dict": model.state_dict(),
             "optimizer": optimizer.state_dict(),
             "cfg": OmegaConf.to_object(cfg),
-            "input_size": input_size,
-            "output_size": output_size,
         },
         path,
     )
-    print(cfg.run_name)
+    print("Saved!", cfg.run_name)
 
 
-def load_datasets(cfg: DictConfig) -> tuple[BinsToVelocityDataset, BinsToVelocityDataset]:
-    train_dataset = load_cached_dataset(cfg=cfg, split="train")
-    val_dataset = load_cached_dataset(cfg=cfg, split="validation")
+def load_datasets(dataset_cfg: DictConfig) -> tuple[BinsToVelocityDataset, BinsToVelocityDataset]:
+    train_dataset = load_cached_dataset(dataset_cfg=dataset_cfg, split="train")
+    val_dataset = load_cached_dataset(dataset_cfg=dataset_cfg, split="validation")
 
     return train_dataset, val_dataset
 
@@ -68,13 +64,12 @@ def train_model(
 ) -> nn.Module:
     # Get the index for padding token
     pad_idx = train_dataset.tgt_vocab.index("<blank>")
-    vocab_src_size = len(train_dataset.src_vocab)
-    vocab_tgt_size = len(train_dataset.tgt_vocab)
+    src_vocab_size, tgt_vocab_size = vocab_sizes(cfg)
 
     # define model parameters and create the model
     model = make_model(
-        input_size=vocab_src_size,
-        output_size=vocab_tgt_size,
+        src_vocab_size=src_vocab_size,
+        tgt_vocab_size=tgt_vocab_size,
         n=cfg.model.n,
         d_model=cfg.model.d_model,
         d_ff=cfg.model.d_ff,
@@ -85,7 +80,7 @@ def train_model(
 
     # Set LabelSmoothing as a criterion for loss calculation
     criterion = LabelSmoothing(
-        size=vocab_tgt_size,
+        size=tgt_vocab_size,
         padding_idx=pad_idx,
         smoothing=cfg.train.label_smoothing,
     )
@@ -112,8 +107,6 @@ def train_model(
     )
     initialize_wandb(cfg)
     best_test_loss = float("inf")
-
-    best_loss = float("inf")
     for epoch in range(cfg.train.num_epochs):
         model.train()
         print(f"Epoch {epoch}", flush=True)
@@ -142,23 +135,14 @@ def train_model(
                 pad_idx=pad_idx,
                 device=cfg.device,
             )
-            print(float(v_loss))
-            if v_loss <= best_test_loss:
-                save_checkpoint(model, optimizer, cfg, vocab_src_size, vocab_tgt_size)
-                best_test_loss = v_loss
 
-        if v_loss <= best_loss:
-            path = f"models/{cfg.run_name}-top-effort.pt"
-            torch.save(
-                {
-                    "model_state_dict": model.state_dict(),
-                    "cfg": OmegaConf.to_object(cfg),
-                    "input_size": len(train_dataset.src_vocab),
-                    "output_size": len(train_dataset.tgt_vocab),
-                },
-                path,
+        if v_loss <= best_test_loss:
+            save_checkpoint(
+                model=model,
+                optimizer=optimizer,
+                cfg=cfg,
             )
-            best_loss = v_loss
+            best_test_loss = v_loss
 
         # Log validation and training losses
         wandb.log(
@@ -208,7 +192,7 @@ def train_epoch(
         loss = criterion(out, target) / batch.ntokens
         loss.backward()
 
-        dist = avg_distance(out, target)
+        dist = calculate_average_distance(out, target)
 
         # Update the model parameters and optimizer gradients every `accum_iter` iterations
         if it % accum_iter == 0 or it == steps - 1:
@@ -270,7 +254,7 @@ def val_epoch(
         total_loss += loss.item()
         total_tokens += batch.ntokens
         tokens += batch.ntokens
-        total_dist += avg_distance(out_rearranged, target).data
+        total_dist += calculate_average_distance(out_rearranged, target)
 
     # Return average loss over all tokens and updated train state
     return total_loss / len(dataloader), total_dist / len(dataloader)

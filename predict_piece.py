@@ -13,7 +13,7 @@ from omegaconf import OmegaConf, DictConfig
 from model import make_model
 from data.dataset import BinsToVelocityDataset
 from modules.label_smoothing import LabelSmoothing
-from utils import avg_distance, piece_av_files, decode_and_output
+from utils import calculate_average_distance, piece_av_files, decode_and_output
 
 
 @torch.no_grad()
@@ -112,7 +112,7 @@ def predict_piece_dashboard(cfg: DictConfig):
         n_tokens = (target != pad_idx).data.sum()
         loss = criterion(out, target) / n_tokens
         total_loss += loss.item()
-        total_dist += avg_distance(out, target).cpu()
+        total_dist += calculate_average_distance(out, target).cpu()
 
     pred_velocities = dataset.tokenizer_tgt.untokenize(predicted_tokens)
     predicted_piece_df = predicted_piece_df.head(len(pred_velocities))
