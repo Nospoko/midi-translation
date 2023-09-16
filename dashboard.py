@@ -62,6 +62,8 @@ def model_predictions_review():
     dataset_name = st.text_input(label="dataset", value=dataset_cfg.dataset_name)
     split = st.text_input(label="split", value="test")
 
+    random_seed = st.selectbox(label="random seed", options=range(20))
+
     dataset_cfg.dataset_name = dataset_name
     dataset = load_cached_dataset(dataset_cfg=dataset_cfg, split=split)
     src_vocab_size, tgt_vocab_size = vocab_sizes(train_cfg)
@@ -79,6 +81,7 @@ def model_predictions_review():
     model.to(DEVICE)
 
     n_samples = 5
+    np.random.seed(random_seed)
     idxs = np.random.randint(len(dataset), size=n_samples)
 
     pad_idx = dataset.tgt_vocab.index("<blank>")
@@ -156,29 +159,27 @@ def model_predictions_review():
         predicted_paths = piece_av_files(piece=pred_piece, save_base=predicted_save_base)
 
         # create a dashboard
+        st.json(record_source)
+        cols = st.columns(4)
         with cols[0]:
             # Unchanged
             st.image(true_piece_paths["pianoroll_path"])
             st.audio(true_piece_paths["mp3_path"])
-            st.table(true_piece.source)
 
         with cols[1]:
             # Quantized
             st.image(src_piece_paths["pianoroll_path"])
             st.audio(src_piece_paths["mp3_path"])
-            st.table(quantized_piece.source)
 
         with cols[2]:
             # Q.velocity ?
             st.image(qv_paths["pianoroll_path"])
             st.audio(qv_paths["mp3_path"])
-            st.table(quantized_vel_piece.source)
 
         with cols[3]:
             # Predicted
             st.image(predicted_paths["pianoroll_path"])
             st.audio(predicted_paths["mp3_path"])
-            st.table(pred_piece.source)
 
 
 def tokenization_review_dashboard():
