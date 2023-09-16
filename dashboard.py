@@ -8,7 +8,6 @@ import pandas as pd
 import streamlit as st
 from fortepyan import MidiPiece
 from omegaconf import OmegaConf
-from hydra.core.global_hydra import GlobalHydra
 
 from model import make_model
 from data.dataset import BinsToVelocityDataset
@@ -98,7 +97,7 @@ def model_predictions_review():
     print("Making predictions ...")
     for record_id in idxs:
         record = dataset.records[record_id]
-        record["source"] = json.loads(record["source"])
+        record_source = json.loads(record["source"])
 
         record_token_ids = dataset[record_id]
 
@@ -111,17 +110,18 @@ def model_predictions_review():
         )
         generated_velocity = dataset.tokenizer_tgt.untokenize(generated_tokens)
 
+        # Just pitches and quantization bins of the source
         src_tokens = [dataset.src_vocab[x] for x in src_token_ids if x != pad_idx]
         source_df = dataset.tokenizer_src.untokenize(src_tokens)
+        quantized_notes = dataset.quantizer.apply_quantization(source_df)
+        quantized_piece = MidiPiece(quantized_notes)
+        quantized_piece.time_shift(-quantized_piece.df.start.min())
 
-        filename = record["midi_filename"]
+        # Reconstruct the sequence as recorded
+        true_notes = pd.DataFrame(record)
+        true_piece = MidiPiece(df=true_notes, source=record_source)
+        true_piece.time_shift(-true_piece.df.start.min())
 
-        true_piece, src_piece = prepare_midi_pieces(
-            record=record,
-            processed=source_df,
-            idx=record_id,
-            dataset=dataset,
-        )
         pred_piece_df = true_piece.df.copy()
         quantized_vel_df = true_piece.df.copy()
 
@@ -129,7 +129,7 @@ def model_predictions_review():
         pred_piece_df["velocity"] = generated_velocity
         pred_piece_df["velocity"] = pred_piece_df["velocity"].fillna(0)
 
-        quantized_vel_df["velocity"] = src_piece.df["velocity"].copy()
+        quantized_vel_df["velocity"] = quantized_piece.df["velocity"].copy()
 
         # create quantized piece with predicted velocities
         pred_piece = MidiPiece(pred_piece_df)
@@ -142,40 +142,40 @@ def model_predictions_review():
         if not os.path.exists(model_dir):
             os.mkdir(model_dir)
 
-        directory = "tmp/dashboard/"
-
-        name = f"{filename.split('.')[0].replace('/', '-')}-{record_id}"
-        pred_piece.source = true_piece.source.copy()
-        pred_piece.source["midi_filename"] = model_dir + "/" + name + ".mid"
-
-        name = f"{filename.split('.')[0].replace('/', '-')}-{record_id}-qv-{dataset.sequence_len}"
-        quantized_vel_piece.source = true_piece.source.copy()
-        quantized_vel_piece.source["midi_filename"] = directory + "common/" + name + ".mid"
-
-        print("Creating files ...")
         # create files
-        paths = piece_av_files(true_piece)
-        src_piece_paths = piece_av_files(src_piece)
-        qv_paths = piece_av_files(quantized_vel_piece)
-        predicted_paths = piece_av_files(pred_piece)
+        true_save_base = os.path.join(model_dir, f"true_{record_id}")
+        true_piece_paths = piece_av_files(piece=true_piece, save_base=true_save_base)
+
+        src_save_base = os.path.join(model_dir, f"src_{record_id}")
+        src_piece_paths = piece_av_files(piece=quantized_piece, save_base=src_save_base)
+
+        qv_save_base = os.path.join(model_dir, f"qv_{record_id}")
+        qv_paths = piece_av_files(piece=quantized_vel_piece, save_base=qv_save_base)
+
+        predicted_save_base = os.path.join(model_dir, f"predicted_{record_id}")
+        predicted_paths = piece_av_files(piece=pred_piece, save_base=predicted_save_base)
 
         # create a dashboard
         with cols[0]:
-            st.image(paths["pianoroll_path"])
-            st.audio(paths["mp3_path"])
+            # Unchanged
+            st.image(true_piece_paths["pianoroll_path"])
+            st.audio(true_piece_paths["mp3_path"])
             st.table(true_piece.source)
 
         with cols[1]:
+            # Quantized
             st.image(src_piece_paths["pianoroll_path"])
             st.audio(src_piece_paths["mp3_path"])
-            st.table(src_piece.source)
+            st.table(quantized_piece.source)
 
         with cols[2]:
+            # Q.velocity ?
             st.image(qv_paths["pianoroll_path"])
             st.audio(qv_paths["mp3_path"])
             st.table(quantized_vel_piece.source)
 
         with cols[3]:
+            # Predicted
             st.image(predicted_paths["pianoroll_path"])
             st.audio(predicted_paths["mp3_path"])
             st.table(pred_piece.source)
@@ -221,41 +221,22 @@ def tokenization_review_dashboard():
 
 def prepare_midi_pieces(
     record: dict,
-    processed: dict,
+    processed_df: pd.DataFrame,
     idx: int,
     dataset: BinsToVelocityDataset,
 ) -> tuple[MidiPiece, MidiPiece]:
     # get dataframes with notes
-    processed_df = pd.DataFrame(processed)
-    piece_source = record.pop("source")
-    notes = pd.DataFrame(record)
     quantized_notes = dataset.quantizer.apply_quantization(processed_df)
-    # we have to pop midi_filename column
-    filename = notes.pop("midi_filename")[0]
 
-    start_time = np.min(notes["start"])
-
-    # normalize start and end time
-    notes["start"] -= start_time
-    notes["end"] -= start_time
+    # Same for the "src" piece
     start_time = np.min(processed_df["start"])
     processed_df["start"] -= start_time
     processed_df["end"] -= start_time
 
-    # create MidiPieces
-    piece = MidiPiece(notes)
-    name = f"{filename.split('.')[0].replace('/', '-')}-{idx}-real-{dataset.sequence_len}"
-    piece.source = piece_source
-    piece.source["midi_filename"] = f"tmp/dashboard/common/{name}.mid"
-
     quantized_piece = MidiPiece(quantized_notes)
-    name = f"{filename.split('.')[0].replace('/', '-')}-{idx}-quantized-{dataset.sequence_len}"
-    quantized_piece.source = piece.source.copy()
-    quantized_piece.source["midi_filename"] = f"tmp/dashboard/common/{name}.mid"
 
-    return piece, quantized_piece
+    return quantized_piece
 
 
 if __name__ == "__main__":
-    GlobalHydra.instance().clear()
     main()

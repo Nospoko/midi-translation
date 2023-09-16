@@ -25,15 +25,14 @@ def vocab_sizes(cfg: DictConfig) -> tuple[int, int]:
     return src_vocab_size, tgt_vocab_size
 
 
-def piece_av_files(piece: MidiPiece) -> dict:
-    # stolen from Tomek
-    midi_file = piece.source["midi_filename"]
-    mp3_path = midi_file.replace(".midi", ".mp3").replace(".mid", ".mp3")
+def piece_av_files(piece: MidiPiece, save_base: str) -> dict:
+    # fixed by Tomek
+    mp3_path = save_base + ".mp3"
 
     if not os.path.exists(mp3_path):
         render_audio.midi_to_mp3(piece.to_midi(), mp3_path)
 
-    pianoroll_path = midi_file.replace(".midi", ".png").replace(".mid", ".png")
+    pianoroll_path = save_base + ".png"
 
     if not os.path.exists(pianoroll_path):
         ff.view.draw_pianoroll_with_velocities(piece)
