@@ -11,8 +11,8 @@ from fortepyan import MidiPiece
 from datasets import load_dataset
 from omegaconf import OmegaConf, DictConfig
 from fortepyan.audio import render as render_audio
-
-from data.dataset import TokenizedMidiDataset
+# BinsToVelocity and BinsToDstart datasets must be imported to use eval(cfg.dataset_class) in load_cached_dataset
+from data.dataset import TokenizedMidiDataset, BinsToVelocityDataset, BinsToDstartDataset
 from modules.encoderdecoder import subsequent_mask
 
 
