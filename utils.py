@@ -101,7 +101,7 @@ def load_cached_dataset(dataset_cfg: DictConfig, split="test") -> BinsToVelocity
     return dataset
 
 
-def predict_sample(
+def generate_sequence(
     src_tokens: torch.Tensor,
     dataset: BinsToVelocityDataset,
     model: nn.Module,

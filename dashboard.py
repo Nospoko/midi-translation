@@ -14,7 +14,7 @@ from model import make_model
 from data.dataset import BinsToVelocityDataset
 from evals.evaluate import load_cached_dataset
 from predict_piece import predict_piece_dashboard
-from utils import piece_av_files, predict_sample, vocab_sizes
+from utils import piece_av_files, generate_sequence, vocab_sizes
 
 
 # For now let's run all dashboards on CPU
@@ -98,26 +98,27 @@ def model_predictions_review():
     print("Making predictions ...")
     for record_id in idxs:
         record = dataset.records[record_id]
-        record_tokens = dataset[record_id]
-
-        src_tokens = record_tokens[0]
-        result = predict_sample(
-            model=model,
-            dataset=dataset,
-            src_tokens=src_tokens,
-            sequence_size=train_cfg.dataset.sequence_size,
-        )
-        src = [dataset.src_vocab[x] for x in src_tokens if x != pad_idx]
         record["source"] = json.loads(record["source"])
 
-        source = dataset.tokenizer_src.untokenize(src)
-        predicted = dataset.tokenizer_tgt.untokenize(result)
+        record_token_ids = dataset[record_id]
+
+        src_token_ids = record_token_ids[0]
+        generated_tokens = generate_sequence(
+            model=model,
+            dataset=dataset,
+            src_tokens=src_token_ids,
+            sequence_size=train_cfg.dataset.sequence_size,
+        )
+        generated_velocity = dataset.tokenizer_tgt.untokenize(generated_tokens)
+
+        src_tokens = [dataset.src_vocab[x] for x in src_token_ids if x != pad_idx]
+        source_df = dataset.tokenizer_src.untokenize(src_tokens)
 
         filename = record["midi_filename"]
 
         true_piece, src_piece = prepare_midi_pieces(
             record=record,
-            processed=source,
+            processed=source_df,
             idx=record_id,
             dataset=dataset,
         )
@@ -125,7 +126,7 @@ def model_predictions_review():
         quantized_vel_df = true_piece.df.copy()
 
         # change untokenized velocities to model predictions
-        pred_piece_df["velocity"] = predicted
+        pred_piece_df["velocity"] = generated_velocity
         pred_piece_df["velocity"] = pred_piece_df["velocity"].fillna(0)
 
         quantized_vel_df["velocity"] = src_piece.df["velocity"].copy()
