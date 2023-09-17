@@ -1,18 +1,15 @@
 import os
-import json
-import pickle
-import hashlib
 
 import torch
+import pandas as pd
 import torch.nn as nn
 import fortepyan as ff
 import matplotlib.pyplot as plt
 from fortepyan import MidiPiece
-from datasets import load_dataset
-from omegaconf import OmegaConf, DictConfig
+from omegaconf import DictConfig
 from fortepyan.audio import render as render_audio
 
-from data.dataset import BinsToVelocityDataset
+from data.tokenizer import MidiEncoder
 from modules.encoderdecoder import subsequent_mask
 
 
@@ -67,58 +64,14 @@ def learning_rate_schedule(step: int, model_size: int, factor: float, warmup: in
     return factor * (model_size ** (-0.5) * min(step ** (-0.5), step * warmup ** (-1.5)))
 
 
-def load_cached_dataset(
-    dataset_cfg: DictConfig,
-    split="test",
-    force_load: bool = False,
-) -> BinsToVelocityDataset:
-    config_hash = hashlib.sha256()
-    config_string = json.dumps(OmegaConf.to_container(dataset_cfg)) + split
-    config_hash.update(config_string.encode())
-    config_hash = config_hash.hexdigest()
-    cache_dir = "tmp/datasets"
-    print(f"Preparing dataset: {config_hash}")
-
-    dataset_cache_file = f"{config_hash}.pkl"
-    dataset_cache_path = os.path.join(cache_dir, dataset_cache_file)
-
-    loaded = False
-    if os.path.exists(dataset_cache_path) and not force_load:
-        try:
-            with open(dataset_cache_path, "rb") as file:
-                dataset = pickle.load(file)
-
-            loaded = True
-            print("Cached dataset loaded successfully!")
-
-        except (EOFError, UnboundLocalError):
-            print("Cache corrupt!", dataset_cache_path)
-            file.close()
-            os.remove(path=dataset_cache_path)
-
-    if not loaded:
-        hf_dataset = load_dataset(dataset_cfg.dataset_name, split=split)
-        dataset = BinsToVelocityDataset(
-            dataset=hf_dataset,
-            n_dstart_bins=dataset_cfg.quantization.dstart,
-            n_velocity_bins=dataset_cfg.quantization.velocity,
-            n_duration_bins=dataset_cfg.quantization.duration,
-            sequence_len=dataset_cfg.sequence_size,
-        )
-        with open(dataset_cache_path, "wb") as file:
-            pickle.dump(dataset, file)
-
-    return dataset
-
-
 def generate_sequence(
     src_tokens: torch.Tensor,
-    dataset: BinsToVelocityDataset,
+    tgt_encoder: MidiEncoder,
+    pad_idx: int,
     model: nn.Module,
     sequence_size: int,
     device: str = "cpu",
-) -> list[str]:
-    pad_idx = dataset.tgt_vocab.index("<blank>")
+) -> pd.DataFrame:
     src_mask = (src_tokens != pad_idx).unsqueeze(-2)
 
     sequence = greedy_decode(
@@ -130,13 +83,18 @@ def generate_sequence(
         device=device,
     )
 
-    out_tokens = [dataset.tgt_vocab[x] for x in sequence if x != pad_idx]
+    out_sequence = tgt_encoder.untokenize(sequence)
 
-    return out_tokens
+    return out_sequence
 
 
 def greedy_decode(
-    model: nn.Module, src: torch.Tensor, src_mask: torch.Tensor, max_len: int, start_symbol: int, device: str = "cpu"
+    model: nn.Module,
+    src: torch.Tensor,
+    src_mask: torch.Tensor,
+    max_len: int,
+    start_symbol: int,
+    device: str = "cpu",
 ) -> torch.Tensor:
     dev = torch.device(device)
     # Pretend to be batches

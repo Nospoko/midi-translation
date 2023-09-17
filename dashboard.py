@@ -1,6 +1,5 @@
 import os
 import glob
-import json
 
 import torch
 import numpy as np
@@ -10,8 +9,8 @@ from fortepyan import MidiPiece
 from omegaconf import OmegaConf
 
 from model import make_model
-from data.dataset import BinsToVelocityDataset
-from evals.evaluate import load_cached_dataset
+from data.quantizer import MidiQuantizer
+from data.dataset import load_cache_dataset
 from predict_piece import predict_piece_dashboard
 from utils import vocab_sizes, piece_av_files, generate_sequence
 
@@ -29,12 +28,6 @@ def main():
         predict_piece_dashboard()
     if mode == "Model predictions":
         model_predictions_review()
-
-
-def get_sample_info(dataset: BinsToVelocityDataset, midi_filename: str):
-    sample_data = dataset.dataset.filter(lambda row: row["midi_filename"] == midi_filename)
-    title, composer = sample_data["title"][0], sample_data["composer"][0]
-    return title, composer
 
 
 def model_predictions_review():
@@ -61,10 +54,19 @@ def model_predictions_review():
     dataset_name = st.text_input(label="dataset", value=dataset_cfg.dataset_name)
     split = st.text_input(label="split", value="test")
 
+    quantizer = MidiQuantizer(
+        n_dstart_bins=dataset_cfg.quantization.dstart,
+        n_duration_bins=dataset_cfg.quantization.duration,
+        n_velocity_bins=dataset_cfg.quantization.velocity,
+    )
+
     random_seed = st.selectbox(label="random seed", options=range(20))
 
-    dataset_cfg.dataset_name = dataset_name
-    dataset = load_cached_dataset(dataset_cfg=dataset_cfg, split=split)
+    dataset = load_cache_dataset(
+        dataset_name=dataset_name,
+        dataset_cfg=dataset_cfg,
+        split=split,
+    )
     src_vocab_size, tgt_vocab_size = vocab_sizes(train_cfg)
 
     model = make_model(
@@ -83,9 +85,9 @@ def model_predictions_review():
     np.random.seed(random_seed)
     idxs = np.random.randint(len(dataset), size=n_samples)
 
-    pad_idx = dataset.tgt_vocab.index("<blank>")
+    pad_idx = dataset.src_encoder.token_to_id["<blank>"]
 
-    cols = st.columns(4)
+    cols = st.columns(5)
     with cols[0]:
         st.markdown("### Unchanged")
     with cols[1]:
@@ -98,27 +100,28 @@ def model_predictions_review():
     # predict velocities and get src, tgt and model output
     print("Making predictions ...")
     for record_id in idxs:
-        record = dataset.records[record_id]
-        record_source = json.loads(record["source"])
+        # Numpy to int :(
+        record = dataset[int(record_id)]
+        record_source = ""
+        src_token_ids = record["source_token_ids"]
 
-        record_token_ids = dataset[record_id]
-
-        src_token_ids = record_token_ids[0]
-        generated_tokens = generate_sequence(
+        generated_velocity = generate_sequence(
             model=model,
-            dataset=dataset,
+            pad_idx=pad_idx,
             src_tokens=src_token_ids,
-            sequence_size=train_cfg.dataset.sequence_size,
+            tgt_encoder=dataset.tgt_encoder,
+            sequence_size=train_cfg.dataset.sequence_len,
         )
-        generated_velocity = dataset.tokenizer_tgt.untokenize(generated_tokens)
 
         # Just pitches and quantization bins of the source
-        src_tokens = [dataset.src_vocab[x] for x in src_token_ids if x != pad_idx]
-        source_df = dataset.tokenizer_src.untokenize(src_tokens)
-        quantized_notes = dataset.quantizer.apply_quantization(source_df)
+        src_tokens = [dataset.src_encoder.vocab[token_id] for token_id in src_token_ids if token_id != pad_idx]
+        source_df = dataset.src_encoder.untokenize(src_tokens)
+
+        quantized_notes = quantizer.apply_quantization(source_df)
         quantized_piece = MidiPiece(quantized_notes)
         quantized_piece.time_shift(-quantized_piece.df.start.min())
 
+        # TODO start here
         # Reconstruct the sequence as recorded
         true_notes = pd.DataFrame(record)
         true_piece = MidiPiece(df=true_notes, source=record_source)
@@ -186,7 +189,12 @@ def tokenization_review_dashboard():
     bins = st.text_input(label="bins", value="3 3 3")
     dataset_cfg = OmegaConf.create({"dataset_name": "roszcz/maestro-v1-sustain", "bins": bins, "sequence_size": 128})
 
-    dataset = load_cached_dataset(dataset_cfg=dataset_cfg)
+    dataset_name = "roszcz/maestro-v1-sustain"
+    dataset = load_cache_dataset(
+        dataset_cfg=dataset_cfg,
+        dataset_name=dataset_name,
+        split="test",
+    )
     bins = bins.replace(" ", "-")
 
     n_samples = 5
@@ -223,7 +231,7 @@ def prepare_midi_pieces(
     record: dict,
     processed_df: pd.DataFrame,
     idx: int,
-    dataset: BinsToVelocityDataset,
+    dataset,
 ) -> tuple[MidiPiece, MidiPiece]:
     # get dataframes with notes
     quantized_notes = dataset.quantizer.apply_quantization(processed_df)
