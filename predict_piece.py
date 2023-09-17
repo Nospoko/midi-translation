@@ -4,16 +4,16 @@ import hydra
 import torch
 import pandas as pd
 import streamlit as st
-from hydra.core.global_hydra import GlobalHydra
 from tqdm import tqdm
 from fortepyan import MidiPiece
 from datasets import load_dataset
 from omegaconf import OmegaConf, DictConfig
+from hydra.core.global_hydra import GlobalHydra
 
 from model import make_model
 from data.dataset import BinsToVelocityDataset
 from modules.label_smoothing import LabelSmoothing
-from utils import calculate_average_distance, piece_av_files, decode_and_output
+from utils import piece_av_files, decode_and_output, calculate_average_distance
 
 
 @torch.no_grad()

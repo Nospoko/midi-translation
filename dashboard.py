@@ -13,8 +13,7 @@ from model import make_model
 from data.dataset import BinsToVelocityDataset
 from evals.evaluate import load_cached_dataset
 from predict_piece import predict_piece_dashboard
-from utils import piece_av_files, generate_sequence, vocab_sizes
-
+from utils import vocab_sizes, piece_av_files, generate_sequence
 
 # For now let's run all dashboards on CPU
 DEVICE = "cpu"

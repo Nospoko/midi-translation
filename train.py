@@ -15,7 +15,7 @@ from data.batch import Batch
 from model import make_model
 from data.dataset import BinsToVelocityDataset
 from modules.label_smoothing import LabelSmoothing
-from utils import calculate_average_distance, load_cached_dataset, learning_rate_schedule, vocab_sizes
+from utils import vocab_sizes, load_cached_dataset, learning_rate_schedule, calculate_average_distance
 
 
 @hydra.main(version_base=None, config_path="configs", config_name="main")
