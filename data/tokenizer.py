@@ -9,6 +9,10 @@ class Tokenizer:
         self.keys = keys
         self.specials = ["<s>", "</s>"]
 
+    def __rich_repr__(self):
+        yield "Tokenizer"
+        yield "keys", self.keys
+
     def __call__(self, record: dict) -> list[str]:
         return self.tokenize(record=record)
 
@@ -36,7 +40,6 @@ class Tokenizer:
                 ignore_index=True,
             )
 
-        # I return dict so that untokenize output is the same type as tokenize input
         return sample
 
 

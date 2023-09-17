@@ -48,41 +48,6 @@ def unprocessed_samples(piece: ff.MidiPiece, sequence_len: int) -> list[dict]:
     return records
 
 
-def process_record(piece: ff.MidiPiece, sequence_len: int, quantizer: MidiQuantizer) -> list[dict]:
-    piece_quantized = quantizer.quantize_piece(piece)
-
-    midi_filename = piece_quantized.source["midi_filename"]
-
-    record = []
-    step = sequence_len // 2
-    iterator = zip(
-        piece.df.rolling(window=sequence_len, step=step),
-        piece_quantized.df.rolling(window=sequence_len, step=step),
-    )
-
-    for subset, quantized in iterator:
-        # rolling sometimes creates subsets with shorter sequence length, they are filtered here
-        if len(quantized) != sequence_len:
-            continue
-
-        sequence = {
-            "midi_filename": midi_filename,
-            "pitch": quantized.pitch.astype("int16").values.T,
-            "dstart_bin": quantized.dstart_bin.astype("int16").values.T,
-            "duration_bin": quantized.duration_bin.astype("int16").values.T,
-            "velocity_bin": quantized.velocity_bin.astype("int16").values.T,
-            "start": subset.start.values,
-            "end": subset.end.values,
-            "duration": subset.duration.values,
-            "velocity": subset.velocity.values,
-            "source": json.dumps(piece.source),
-        }
-
-        record.append(sequence)
-
-    return record
-
-
 if __name__ == "__main__":
     # get huggingface token from environment variables
     token = os.environ["HUGGINGFACE_TOKEN"]

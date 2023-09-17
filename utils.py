@@ -67,36 +67,47 @@ def learning_rate_schedule(step: int, model_size: int, factor: float, warmup: in
     return factor * (model_size ** (-0.5) * min(step ** (-0.5), step * warmup ** (-1.5)))
 
 
-def load_cached_dataset(dataset_cfg: DictConfig, split="test") -> BinsToVelocityDataset:
+def load_cached_dataset(
+    dataset_cfg: DictConfig,
+    split="test",
+    force_load: bool = False,
+) -> BinsToVelocityDataset:
     config_hash = hashlib.sha256()
     config_string = json.dumps(OmegaConf.to_container(dataset_cfg)) + split
     config_hash.update(config_string.encode())
     config_hash = config_hash.hexdigest()
     cache_dir = "tmp/datasets"
     print(f"Preparing dataset: {config_hash}")
-    try:
-        dataset_cache_file = f"{config_hash}.pkl"
-        dataset_cache_path = os.path.join(cache_dir, dataset_cache_file)
 
-        if os.path.exists(dataset_cache_path):
-            file = open(dataset_cache_path, "rb")
-            dataset = pickle.load(file)
-        else:
-            file = open(dataset_cache_path, "wb")
-            hf_dataset = load_dataset(dataset_cfg.dataset_name, split=split)
-            dataset = BinsToVelocityDataset(
-                dataset=hf_dataset,
-                n_dstart_bins=dataset_cfg.quantization.dstart,
-                n_velocity_bins=dataset_cfg.quantization.velocity,
-                n_duration_bins=dataset_cfg.quantization.duration,
-                sequence_len=dataset_cfg.sequence_size,
-            )
+    dataset_cache_file = f"{config_hash}.pkl"
+    dataset_cache_path = os.path.join(cache_dir, dataset_cache_file)
+
+    loaded = False
+    if os.path.exists(dataset_cache_path) and not force_load:
+        try:
+            with open(dataset_cache_path, "rb") as file:
+                dataset = pickle.load(file)
+
+            loaded = True
+            print("Cached dataset loaded successfully!")
+
+        except (EOFError, UnboundLocalError):
+            print("Cache corrupt!", dataset_cache_path)
+            file.close()
+            os.remove(path=dataset_cache_path)
+
+    if not loaded:
+        hf_dataset = load_dataset(dataset_cfg.dataset_name, split=split)
+        dataset = BinsToVelocityDataset(
+            dataset=hf_dataset,
+            n_dstart_bins=dataset_cfg.quantization.dstart,
+            n_velocity_bins=dataset_cfg.quantization.velocity,
+            n_duration_bins=dataset_cfg.quantization.duration,
+            sequence_len=dataset_cfg.sequence_size,
+        )
+        with open(dataset_cache_path, "wb") as file:
             pickle.dump(dataset, file)
-        file.close()
-    except (EOFError, UnboundLocalError):
-        file.close()
-        os.remove(path=dataset_cache_path)
-        load_cached_dataset(dataset_cfg, split)
+
     return dataset
 
 
