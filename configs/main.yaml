@@ -6,9 +6,11 @@ train:
   distributed: False
   label_smoothing: 0.1
 
+dataset_name: 'roszcz/maestro-v1-sustain'
+
 dataset:
-  dataset_name: 'roszcz/maestro-v1-sustain'
-  sequence_size: 128
+  sequence_len: 128
+  sequence_step: 42
 
   quantization:
     duration: 3

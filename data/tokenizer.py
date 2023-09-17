@@ -4,7 +4,26 @@ import pandas as pd
 from omegaconf import DictConfig
 
 
-class QuantizedMidiEncoder:
+class MidiEncoder:
+    def tokenize(self, record: dict) -> list[str]:
+        raise NotImplementedError("Your encoder needs *tokenize* implementation")
+
+    def untokenize(self, tokens: list[str]) -> pd.DataFrame:
+        raise NotImplementedError("Your encoder needs *untokenize* implementation")
+
+    def decode(self, token_ids: list[int]) -> pd.DataFrame:
+        tokens = [self.vocab[token_id] for token_id in token_ids]
+        df = self.untokenize(tokens)
+
+        return df
+
+    def encode(self, record: dict) -> list[int]:
+        tokens = self.tokenize(record)
+        token_ids = [self.token_to_id[token] for token in tokens]
+        return token_ids
+
+
+class QuantizedMidiEncoder(MidiEncoder):
     def __init__(self, quantization_cfg: DictConfig):
         self.quantization_cfg = quantization_cfg
         self.keys = ["pitch", "dstart_bin", "duration_bin", "velocity_bin"]
@@ -50,12 +69,6 @@ class QuantizedMidiEncoder:
         tokens.append("</s>")
         return tokens
 
-    def decode(self, token_ids: list[int]) -> pd.DataFrame:
-        tokens = [self.vocab[token_id] for token_id in token_ids]
-        df = self.untokenize(tokens)
-
-        return df
-
     def untokenize(self, tokens: list[str]) -> pd.DataFrame:
         samples = []
         for token in tokens:
@@ -70,13 +83,8 @@ class QuantizedMidiEncoder:
 
         return df
 
-    def encode(self, record: dict) -> list[int]:
-        tokens = self.tokenize(record)
-        token_ids = [self.token_to_id[token] for token in tokens]
-        return token_ids
 
-
-class VelocityEncoder:
+class VelocityEncoder(MidiEncoder):
     def __init__(self):
         self.key = "velocity"
         self.specials = ["<s>", "</s>", "<blank>"]
@@ -99,20 +107,9 @@ class VelocityEncoder:
         tokens = ["<s>"] + velocity_tokens + ["</s>"]
         return tokens
 
-    def encode(self, record: dict) -> list[int]:
-        tokens = self.tokenize(record)
-        token_ids = [self.token_to_id[token] for token in tokens]
-        return token_ids
-
     def untokenize(self, tokens: list[str]) -> pd.DataFrame:
         velocities = [int(token) for token in tokens if token not in self.specials]
         df = pd.DataFrame(velocities, columns=["velocity"])
-
-        return df
-
-    def decode(self, token_ids: list[int]) -> pd.DataFrame:
-        tokens = [self.vocab[token_id] for token_id in token_ids]
-        df = self.untokenize(tokens)
 
         return df
 

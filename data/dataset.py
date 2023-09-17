@@ -1,63 +1,29 @@
 import json
+import hashlib
 import itertools
 
 import torch
 import pandas as pd
 import fortepyan as ff
 from tqdm import tqdm
-from datasets import Dataset
+from datasets import Dataset, load_dataset
+from omegaconf import OmegaConf, DictConfig
 from torch.utils.data import Dataset as TorchDataset
 
 from data.quantizer import MidiQuantizer
-from data.tokenizer import Tokenizer, VelocityTokenizer
+from data.tokenizer import Tokenizer, MidiEncoder, VelocityEncoder, VelocityTokenizer, QuantizedMidiEncoder
 
 
-def process_record(
-    piece: ff.MidiPiece,
-    sequence_len: int,
-    quantizer: MidiQuantizer,
-) -> Dataset:
-    piece_quantized = quantizer.quantize_piece(piece)
-
-    midi_filename = piece_quantized.source["midi_filename"]
-
-    record = []
-    step = sequence_len // 2
-    iterator = zip(
-        piece.df.rolling(window=sequence_len, step=step),
-        piece_quantized.df.rolling(window=sequence_len, step=step),
-    )
-
-    for subset, quantized in iterator:
-        # rolling sometimes creates subsets with shorter sequence length, they are filtered here
-        if len(quantized) != sequence_len:
-            continue
-
-        sequence = {
-            "midi_filename": midi_filename,
-            "pitch": quantized.pitch.astype("int16").values.T,
-            "dstart_bin": quantized.dstart_bin.astype("int16").values.T,
-            "duration_bin": quantized.duration_bin.astype("int16").values.T,
-            "velocity_bin": quantized.velocity_bin.astype("int16").values.T,
-            "start": subset.start.values,
-            "end": subset.end.values,
-            "duration": subset.duration.values,
-            "velocity": subset.velocity.values,
-            "source": json.dumps(piece.source),
-        }
-
-        record.append(sequence)
-
-    return record
-
-
-def process_dataset(
+def build_translation_dataset(
     dataset: Dataset,
-    quantizer: MidiQuantizer,
-    sequence_len: int,
-    sequence_step: int,
-):
-    # ~90s
+    dataset_cfg: DictConfig,
+) -> Dataset:
+    # ~90s for giant midi
+    quantizer = MidiQuantizer(
+        n_dstart_bins=dataset_cfg.quantization.dstart,
+        n_duration_bins=dataset_cfg.quantization.duration,
+        n_velocity_bins=dataset_cfg.quantization.velocity,
+    )
     quantized_pieces = []
     for it, record in tqdm(enumerate(dataset), total=len(dataset)):
         piece = ff.MidiPiece.from_huggingface(record)
@@ -66,14 +32,14 @@ def process_dataset(
         qpiece.source |= {"base_record_id": it, "dataset_name": dataset.info.dataset_name}
         quantized_pieces.append(qpiece)
 
-    # ~20min
+    # ~20min for giant midi
     chopped_sequences = []
     for it, piece in tqdm(enumerate(quantized_pieces), total=len(quantized_pieces)):
-        n_samples = (piece.size - sequence_len) // sequence_step
+        n_samples = (piece.size - dataset_cfg.sequence_len) // dataset_cfg.sequence_step
         for jt in range(n_samples):
-            sta = jt * sequence_step
-            finish = sta + sequence_len
-            part = piece[sta:finish]
+            start = jt * dataset_cfg.sequence_step
+            finish = start + dataset_cfg.sequence_len
+            part = piece[start:finish]
 
             sequence = {
                 "pitch": part.df.pitch.astype("int16").values.T,
@@ -98,26 +64,95 @@ class MyTokenizedMidiDataset(TorchDataset):
     def __init__(
         self,
         dataset: Dataset,
-        src_tokenizer: Tokenizer,
-        tgt_tokenizer: Tokenizer,
+        src_encoder: MidiEncoder,
+        tgt_encoder: MidiEncoder,
     ):
         self.dataset = dataset
-        self.src_tokenizer = src_tokenizer
-        self.tgt_tokenizer = tgt_tokenizer
+        self.src_encoder = src_encoder
+        self.tgt_encoder = tgt_encoder
 
     def __len__(self) -> int:
         return len(self.dataset)
 
     def __getitem__(self, idx: int) -> dict:
         record = self.dataset[idx]
-        source_tokens = self.src_tokenizer(record)
-        target_tokens = self.tgt_tokenizer(record)
+        source_tokens_ids = self.src_encoder.encode(record)
+        target_tokens_ids = self.tgt_encoder.encode(record)
 
         out = {
-            "src": source_tokens,
-            "tgt": target_tokens,
+            "source_tokens_ids": source_tokens_ids,
+            "target_tokens_ids": target_tokens_ids,
         }
         return out
+
+
+def load_cache_dataset(
+    dataset_cfg: DictConfig,
+    dataset_name: str,
+    split: str,
+    force_load: bool = False,
+) -> MyTokenizedMidiDataset:
+    # Prepare caching hash
+    config_hash = hashlib.sha256()
+    config_string = json.dumps(OmegaConf.to_container(dataset_cfg)) + split + dataset_name
+    config_hash.update(config_string.encode())
+    config_hash = config_hash.hexdigest()
+
+    # Prepare midi encoders
+    src_encoder = QuantizedMidiEncoder(dataset_cfg.quantization)
+    tgt_encoder = VelocityEncoder()
+
+    dataset_cache_path = f"tmp/datasets/{config_hash}"
+    if not force_load:
+        try:
+            translation_dataset = Dataset.load_from_disk(dataset_cache_path)
+
+            tokenized_dataset = TokenizedMidiDataset(
+                dataset=translation_dataset,
+                src_encoder=src_encoder,
+                tgt_encoder=tgt_encoder,
+            )
+            return tokenized_dataset
+        except Exception as e:
+            print("Failed loading cached dataset:", e)
+
+    print("Building translation dataset from", dataset_name, split)
+    midi_dataset = load_dataset(dataset_name, split=split)
+    translation_dataset = build_translation_dataset(
+        dataset=midi_dataset,
+        dataset_cfg=dataset_cfg,
+    )
+    translation_dataset.save_to_disk(dataset_cache_path)
+
+    tokenized_dataset = TokenizedMidiDataset(
+        dataset=translation_dataset,
+        src_encoder=src_encoder,
+        tgt_encoder=tgt_encoder,
+    )
+    return tokenized_dataset
+
+
+def build_tokenized_dataset(
+    dataset_cfg: DictConfig,
+    dataset_name: str,
+    split: str,
+) -> MyTokenizedMidiDataset:
+    midi_dataset = load_dataset(dataset_name, split=split)
+
+    translation_dataset = build_translation_dataset(
+        dataset=midi_dataset,
+        dataset_cfg=dataset_cfg,
+    )
+
+    src_encoder = QuantizedMidiEncoder(dataset_cfg.quantization)
+    tgt_encoder = VelocityEncoder()
+
+    dataset = TokenizedMidiDataset(
+        dataset=translation_dataset,
+        src_encoder=src_encoder,
+        tgt_encoder=tgt_encoder,
+    )
+    return dataset
 
 
 class TokenizedMidiDataset:
@@ -225,6 +260,45 @@ class TokenizedMidiDataset:
 
     def __len__(self):
         return len(self.samples)
+
+
+def process_record(
+    piece: ff.MidiPiece,
+    sequence_len: int,
+    quantizer: MidiQuantizer,
+) -> Dataset:
+    piece_quantized = quantizer.quantize_piece(piece)
+
+    midi_filename = piece_quantized.source["midi_filename"]
+
+    record = []
+    step = sequence_len // 2
+    iterator = zip(
+        piece.df.rolling(window=sequence_len, step=step),
+        piece_quantized.df.rolling(window=sequence_len, step=step),
+    )
+
+    for subset, quantized in iterator:
+        # rolling sometimes creates subsets with shorter sequence length, they are filtered here
+        if len(quantized) != sequence_len:
+            continue
+
+        sequence = {
+            "midi_filename": midi_filename,
+            "pitch": quantized.pitch.astype("int16").values.T,
+            "dstart_bin": quantized.dstart_bin.astype("int16").values.T,
+            "duration_bin": quantized.duration_bin.astype("int16").values.T,
+            "velocity_bin": quantized.velocity_bin.astype("int16").values.T,
+            "start": subset.start.values,
+            "end": subset.end.values,
+            "duration": subset.duration.values,
+            "velocity": subset.velocity.values,
+            "source": json.dumps(piece.source),
+        }
+
+        record.append(sequence)
+
+    return record
 
 
 class BinsToVelocityDataset(TokenizedMidiDataset):
