@@ -90,7 +90,7 @@ def load_cache_dataset(
     dataset_cfg: DictConfig,
     dataset_name: str,
     split: str,
-    force_load: bool = False,
+    force_build: bool = False,
 ) -> MyTokenizedMidiDataset:
     # Prepare caching hash
     config_hash = hashlib.sha256()
@@ -103,11 +103,11 @@ def load_cache_dataset(
     tgt_encoder = VelocityEncoder()
 
     dataset_cache_path = f"tmp/datasets/{config_hash}"
-    if not force_load:
+    if not force_build:
         try:
             translation_dataset = Dataset.load_from_disk(dataset_cache_path)
 
-            tokenized_dataset = TokenizedMidiDataset(
+            tokenized_dataset = MyTokenizedMidiDataset(
                 dataset=translation_dataset,
                 src_encoder=src_encoder,
                 tgt_encoder=tgt_encoder,
@@ -124,7 +124,7 @@ def load_cache_dataset(
     )
     translation_dataset.save_to_disk(dataset_cache_path)
 
-    tokenized_dataset = TokenizedMidiDataset(
+    tokenized_dataset = MyTokenizedMidiDataset(
         dataset=translation_dataset,
         src_encoder=src_encoder,
         tgt_encoder=tgt_encoder,
@@ -147,7 +147,7 @@ def build_tokenized_dataset(
     src_encoder = QuantizedMidiEncoder(dataset_cfg.quantization)
     tgt_encoder = VelocityEncoder()
 
-    dataset = TokenizedMidiDataset(
+    dataset = MyTokenizedMidiDataset(
         dataset=translation_dataset,
         src_encoder=src_encoder,
         tgt_encoder=tgt_encoder,
