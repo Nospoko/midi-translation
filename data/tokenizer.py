@@ -96,6 +96,14 @@ class VelocityEncoder(MidiEncoder):
         self._build_vocab()
         self.token_to_id = {token: it for it, token in enumerate(self.vocab)}
 
+    def __rich_repr__(self):
+        yield "VelocityEncoder"
+        yield "vocab_size", self.vocab_size
+
+    @property
+    def vocab_size(self) -> int:
+        return len(self.vocab)
+
     def _build_vocab(self):
         self.vocab += [str(possible_velocity) for possible_velocity in range(128)]
 

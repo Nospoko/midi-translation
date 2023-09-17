@@ -13,14 +13,14 @@ from torch.optim.lr_scheduler import LambdaLR
 import wandb
 from data.batch import Batch
 from model import make_model
-from data.dataset import BinsToVelocityDataset
 from modules.label_smoothing import LabelSmoothing
-from utils import vocab_sizes, load_cached_dataset, learning_rate_schedule, calculate_average_distance
+from data.dataset import MyTokenizedMidiDataset, load_cache_dataset
+from utils import vocab_sizes, learning_rate_schedule, calculate_average_distance
 
 
 @hydra.main(version_base=None, config_path="configs", config_name="main")
 def main(cfg: DictConfig):
-    train_dataset, val_dataset = load_datasets(dataset_cfg=cfg.dataset)
+    train_dataset, val_dataset = load_datasets(dataset_name=cfg.dataset_name, dataset_cfg=cfg.dataset)
     train_model(train_dataset, val_dataset, cfg)
     print(cfg.run_name)
 
@@ -42,9 +42,12 @@ def save_checkpoint(
     print("Saved!", cfg.run_name)
 
 
-def load_datasets(dataset_cfg: DictConfig) -> tuple[BinsToVelocityDataset, BinsToVelocityDataset]:
-    train_dataset = load_cached_dataset(dataset_cfg=dataset_cfg, split="train")
-    val_dataset = load_cached_dataset(dataset_cfg=dataset_cfg, split="validation")
+def load_datasets(
+    dataset_name: str,
+    dataset_cfg: DictConfig,
+) -> tuple[MyTokenizedMidiDataset, MyTokenizedMidiDataset]:
+    train_dataset = load_cache_dataset(dataset_name=dataset_name, dataset_cfg=dataset_cfg, split="train")
+    val_dataset = load_cache_dataset(dataset_name=dataset_name, dataset_cfg=dataset_cfg, split="validation")
 
     return train_dataset, val_dataset
 
@@ -58,12 +61,12 @@ def initialize_wandb(cfg: DictConfig):
 
 
 def train_model(
-    train_dataset: BinsToVelocityDataset,
-    val_dataset: BinsToVelocityDataset,
+    train_dataset: MyTokenizedMidiDataset,
+    val_dataset: MyTokenizedMidiDataset,
     cfg: DictConfig,
 ) -> nn.Module:
     # Get the index for padding token
-    pad_idx = train_dataset.tgt_vocab.index("<blank>")
+    pad_idx = train_dataset.src_encoder.token_to_id["<blank>"]
     src_vocab_size, tgt_vocab_size = vocab_sizes(cfg)
 
     # define model parameters and create the model
@@ -177,11 +180,11 @@ def train_epoch(
 
     # create progress bar
     steps = len(dataloader)
-    pbar = tqdm(dataloader, total=steps)
-    for b in pbar:
-        batch = Batch(src=b[0], tgt=b[1], pad_idx=pad_idx)
-
-        batch.to(device)
+    progress_bar = tqdm(dataloader, total=steps)
+    for batch in progress_bar:
+        src = batch["source_tokens_ids"].to(device)
+        tgt = batch["target_tokens_ids"].to(device)
+        batch = Batch(src=src, tgt=tgt, pad_idx=pad_idx)
 
         encoded_decoded = model.forward(batch.src, batch.tgt, batch.src_mask, batch.tgt_mask)
         out = model.generator(encoded_decoded)
@@ -215,7 +218,7 @@ def train_epoch(
             lr = optimizer.param_groups[0]["lr"]
             elapsed = time.time() - start
             tok_rate = tokens / elapsed
-            pbar.set_description(
+            progress_bar.set_description(
                 f"Step: {it:6d}/{steps} | acc_step: {n_accum:3d} | loss: {loss_item:6.2f} | dist: {dist:6.2f}"
                 + f"| tps: {tok_rate:7.1f} | lr: {lr:6.1e}"
             )
@@ -240,9 +243,10 @@ def val_epoch(
     tokens = 0
     total_dist = 0
 
-    for b in tqdm(dataloader):
-        batch = Batch(src=b[0], tgt=b[1], pad_idx=pad_idx)
-        batch.to(device)
+    for batch in tqdm(dataloader):
+        src = batch["source_tokens_ids"].to(device)
+        tgt = batch["target_tokens_ids"].to(device)
+        batch = Batch(src=src, tgt=tgt, pad_idx=pad_idx)
 
         encoded_decoded = model.forward(batch.src, batch.tgt, batch.src_mask, batch.tgt_mask)
         out = model.generator(encoded_decoded)

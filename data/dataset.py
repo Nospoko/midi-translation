@@ -64,15 +64,25 @@ class MyTokenizedMidiDataset(TorchDataset):
     def __init__(
         self,
         dataset: Dataset,
+        dataset_cfg: DictConfig,
         src_encoder: MidiEncoder,
         tgt_encoder: MidiEncoder,
     ):
         self.dataset = dataset
+        self.dataset_cfg = dataset_cfg
         self.src_encoder = src_encoder
         self.tgt_encoder = tgt_encoder
 
     def __len__(self) -> int:
         return len(self.dataset)
+
+    def __rich_repr__(self):
+        yield "MyTokenizedMidiDataset"
+        yield "size", len(self)
+        # Nicer print
+        yield "cfg", OmegaConf.to_container(self.dataset_cfg)
+        yield "src_encoder", self.src_encoder
+        yield "tgt_encoder", self.tgt_encoder
 
     def __getitem__(self, idx: int) -> dict:
         record = self.dataset[idx]
@@ -80,8 +90,8 @@ class MyTokenizedMidiDataset(TorchDataset):
         target_tokens_ids = self.tgt_encoder.encode(record)
 
         out = {
-            "source_tokens_ids": source_tokens_ids,
-            "target_tokens_ids": target_tokens_ids,
+            "source_tokens_ids": torch.tensor(source_tokens_ids, dtype=torch.int64),
+            "target_tokens_ids": torch.tensor(target_tokens_ids, dtype=torch.int64),
         }
         return out
 
@@ -109,6 +119,7 @@ def load_cache_dataset(
 
             tokenized_dataset = MyTokenizedMidiDataset(
                 dataset=translation_dataset,
+                dataset_cfg=dataset_cfg,
                 src_encoder=src_encoder,
                 tgt_encoder=tgt_encoder,
             )
@@ -126,33 +137,11 @@ def load_cache_dataset(
 
     tokenized_dataset = MyTokenizedMidiDataset(
         dataset=translation_dataset,
+        dataset_cfg=dataset_cfg,
         src_encoder=src_encoder,
         tgt_encoder=tgt_encoder,
     )
     return tokenized_dataset
-
-
-def build_tokenized_dataset(
-    dataset_cfg: DictConfig,
-    dataset_name: str,
-    split: str,
-) -> MyTokenizedMidiDataset:
-    midi_dataset = load_dataset(dataset_name, split=split)
-
-    translation_dataset = build_translation_dataset(
-        dataset=midi_dataset,
-        dataset_cfg=dataset_cfg,
-    )
-
-    src_encoder = QuantizedMidiEncoder(dataset_cfg.quantization)
-    tgt_encoder = VelocityEncoder()
-
-    dataset = MyTokenizedMidiDataset(
-        dataset=translation_dataset,
-        src_encoder=src_encoder,
-        tgt_encoder=tgt_encoder,
-    )
-    return dataset
 
 
 class TokenizedMidiDataset:
