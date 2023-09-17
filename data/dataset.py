@@ -1,6 +1,6 @@
+import json
 import itertools
 
-import json
 import torch
 import pandas as pd
 import fortepyan as ff
@@ -16,7 +16,7 @@ def process_record(
     piece: ff.MidiPiece,
     sequence_len: int,
     quantizer: MidiQuantizer,
-) -> list[dict]:
+) -> Dataset:
     piece_quantized = quantizer.quantize_piece(piece)
 
     midi_filename = piece_quantized.source["midi_filename"]
@@ -73,7 +73,7 @@ def process_dataset(
         for jt in range(n_samples):
             sta = jt * sequence_step
             finish = sta + sequence_len
-            part = piece[sta: finish]
+            part = piece[sta:finish]
 
             sequence = {
                 "pitch": part.df.pitch.astype("int16").values.T,
@@ -90,7 +90,8 @@ def process_dataset(
             }
             chopped_sequences.append(sequence)
 
-    return chopped_sequences
+    new_dataset = Dataset.from_list(chopped_sequences)
+    return new_dataset
 
 
 class MyTokenizedMidiDataset(TorchDataset):
@@ -251,6 +252,8 @@ class BinsToVelocityDataset(TokenizedMidiDataset):
         )
 
     def build_vocab(self) -> tuple[list[str], list[str]]:
+        # This is hardcoded in multiple places (here & tokenizer)
+        # which is bad and I want to untangle this FIXME
         vocab_src, vocab_tgt = ["<s>", "<blank>", "</s>"], ["<s>", "<blank>", "</s>"]
 
         # every combination of pitch + dstart
