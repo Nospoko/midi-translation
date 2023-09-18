@@ -95,6 +95,11 @@ class MyTokenizedMidiDataset(TorchDataset):
         }
         return out
 
+    def get_complete_record(self, idx: int) -> dict:
+        # The usual token ids + everything we store
+        out = self[idx] | self.dataset[idx]
+        return out
+
 
 def load_cache_dataset(
     dataset_cfg: DictConfig,

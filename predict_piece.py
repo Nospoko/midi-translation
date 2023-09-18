@@ -11,7 +11,7 @@ from omegaconf import OmegaConf, DictConfig
 from hydra.core.global_hydra import GlobalHydra
 
 from model import make_model
-from data.dataset import BinsToVelocityDataset
+from data.dataset import MyTokenizedMidiDataset
 from modules.label_smoothing import LabelSmoothing
 from utils import piece_av_files, decode_and_output, calculate_average_distance
 
@@ -47,7 +47,7 @@ def predict_piece_dashboard(cfg: DictConfig):
             midi_filename = st.selectbox(label="piece", options=[filename for filename in hf_dataset["midi_filename"]])
         one_record_dataset = hf_dataset.filter(lambda x: x["midi_filename"] == midi_filename)
 
-    dataset = BinsToVelocityDataset(
+    dataset = MyTokenizedMidiDataset(
         dataset=one_record_dataset,
         n_dstart_bins=int(n_dstart_bins),
         n_duration_bins=int(n_duration_bins),

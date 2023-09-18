@@ -1,5 +1,6 @@
 import os
 import glob
+import json
 
 import torch
 import numpy as np
@@ -51,7 +52,7 @@ def model_predictions_review():
     st.json(dataset_params, expanded=True)
 
     dataset_cfg = train_cfg.dataset
-    dataset_name = st.text_input(label="dataset", value=dataset_cfg.dataset_name)
+    dataset_name = st.text_input(label="dataset", value=train_cfg.dataset_name)
     split = st.text_input(label="split", value="test")
 
     quantizer = MidiQuantizer(
@@ -101,8 +102,8 @@ def model_predictions_review():
     print("Making predictions ...")
     for record_id in idxs:
         # Numpy to int :(
-        record = dataset[int(record_id)]
-        record_source = ""
+        record = dataset.get_complete_record(int(record_id))
+        record_source = json.loads(record["source"])
         src_token_ids = record["source_token_ids"]
 
         generated_velocity = generate_sequence(
@@ -123,7 +124,8 @@ def model_predictions_review():
 
         # TODO start here
         # Reconstruct the sequence as recorded
-        true_notes = pd.DataFrame(record)
+        midi_columns = ["pitch", "start", "end", "duration", "velocity"]
+        true_notes = pd.DataFrame({c: record[c] for c in midi_columns})
         true_piece = MidiPiece(df=true_notes, source=record_source)
         true_piece.time_shift(-true_piece.df.start.min())
 
