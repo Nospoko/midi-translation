@@ -44,6 +44,10 @@ def predict_piece_dashboard():
     st.markdown("Model parameters:")
     st.table(params)
 
+    dataset_params = OmegaConf.to_container(train_cfg.dataset)
+    st.markdown("Dataset config:")
+    st.json(dataset_params, expanded=True)
+
     dataset_name = st.text_input(label="dataset", value=train_cfg.dataset_name)
     split = st.text_input(label="split", value="test")
     record_id = st.number_input(label="record id", value=0)

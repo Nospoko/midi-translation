@@ -182,8 +182,8 @@ def train_epoch(
     steps = len(dataloader)
     progress_bar = tqdm(dataloader, total=steps)
     for batch in progress_bar:
-        src = batch["source_tokens_ids"].to(device)
-        tgt = batch["target_tokens_ids"].to(device)
+        src = batch["source_token_ids"].to(device)
+        tgt = batch["target_token_ids"].to(device)
         batch = Batch(src=src, tgt=tgt, pad_idx=pad_idx)
 
         encoded_decoded = model.forward(batch.src, batch.tgt, batch.src_mask, batch.tgt_mask)
@@ -244,8 +244,8 @@ def val_epoch(
     total_dist = 0
 
     for batch in tqdm(dataloader):
-        src = batch["source_tokens_ids"].to(device)
-        tgt = batch["target_tokens_ids"].to(device)
+        src = batch["source_token_ids"].to(device)
+        tgt = batch["target_token_ids"].to(device)
         batch = Batch(src=src, tgt=tgt, pad_idx=pad_idx)
 
         encoded_decoded = model.forward(batch.src, batch.tgt, batch.src_mask, batch.tgt_mask)
