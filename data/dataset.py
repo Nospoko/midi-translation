@@ -35,29 +35,40 @@ def build_translation_dataset(
     # ~20min for giant midi
     chopped_sequences = []
     for it, piece in tqdm(enumerate(quantized_pieces), total=len(quantized_pieces)):
-        n_samples = (piece.size - dataset_cfg.sequence_len) // dataset_cfg.sequence_step
-        for jt in range(n_samples):
-            start = jt * dataset_cfg.sequence_step
-            finish = start + dataset_cfg.sequence_len
-            part = piece[start:finish]
-
-            sequence = {
-                "pitch": part.df.pitch.astype("int16").values.T,
-                # Quantized features
-                "dstart_bin": part.df.dstart_bin.astype("int16").values.T,
-                "duration_bin": part.df.duration_bin.astype("int16").values.T,
-                "velocity_bin": part.df.velocity_bin.astype("int16").values.T,
-                # Ground truth
-                "start": part.df.start.values,
-                "end": part.df.end.values,
-                "duration": part.df.duration.values,
-                "velocity": part.df.velocity.values,
-                "source": json.dumps(part.source),
-            }
-            chopped_sequences.append(sequence)
+        chopped_sequences += quantized_piece_to_records(
+            piece=piece,
+            sequence_len=dataset_cfg.sequence_len,
+            sequence_step=dataset_cfg.sequence_step,
+        )
 
     new_dataset = Dataset.from_list(chopped_sequences)
     return new_dataset
+
+
+def quantized_piece_to_records(piece: ff.MidiPiece, sequence_len: int, sequence_step: int):
+    chopped_sequences = []
+    n_samples = (piece.size - sequence_len) // sequence_step
+    for jt in range(n_samples):
+        start = jt * sequence_step
+        finish = start + sequence_len
+        part = piece[start:finish]
+
+        sequence = {
+            "pitch": part.df.pitch.astype("int16").values.T,
+            # Quantized features
+            "dstart_bin": part.df.dstart_bin.astype("int16").values.T,
+            "duration_bin": part.df.duration_bin.astype("int16").values.T,
+            "velocity_bin": part.df.velocity_bin.astype("int16").values.T,
+            # Ground truth
+            "start": part.df.start.values,
+            "end": part.df.end.values,
+            "duration": part.df.duration.values,
+            "velocity": part.df.velocity.values,
+            "source": json.dumps(part.source),
+        }
+        chopped_sequences.append(sequence)
+
+    return chopped_sequences
 
 
 class MyTokenizedMidiDataset(TorchDataset):

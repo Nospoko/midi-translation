@@ -55,6 +55,7 @@ def model_predictions_review():
     dataset_name = st.text_input(label="dataset", value=train_cfg.dataset_name)
     split = st.text_input(label="split", value="test")
 
+    # Prepare everything required to make inference
     quantizer = MidiQuantizer(
         n_dstart_bins=dataset_cfg.quantization.dstart,
         n_duration_bins=dataset_cfg.quantization.duration,

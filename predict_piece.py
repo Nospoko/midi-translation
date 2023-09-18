@@ -1,3 +1,4 @@
+import os
 import glob
 
 import hydra
@@ -6,61 +7,71 @@ import pandas as pd
 import streamlit as st
 from tqdm import tqdm
 from fortepyan import MidiPiece
-from datasets import load_dataset
-from omegaconf import OmegaConf, DictConfig
+from omegaconf import OmegaConf
+from datasets import Dataset, load_dataset
 from hydra.core.global_hydra import GlobalHydra
 
 from model import make_model
-from data.dataset import MyTokenizedMidiDataset
+from data.quantizer import MidiQuantizer
 from modules.label_smoothing import LabelSmoothing
-from utils import piece_av_files, decode_and_output, calculate_average_distance
+from data.tokenizer import VelocityEncoder, QuantizedMidiEncoder
+from data.dataset import MyTokenizedMidiDataset, quantized_piece_to_records
+from utils import vocab_sizes, piece_av_files, decode_and_output, calculate_average_distance
 
 
 @torch.no_grad()
-def predict_piece_dashboard(cfg: DictConfig):
+def predict_piece_dashboard():
+    dev = torch.device("cpu")
+
     with st.sidebar:
         model_path = st.selectbox(label="model", options=glob.glob("models/*.pt"))
 
-    checkpoint = torch.load(model_path, map_location=cfg.device)
+    checkpoint = torch.load(model_path, map_location=dev)
     params = pd.DataFrame(checkpoint["cfg"]["model"], index=[0])
     train_cfg = OmegaConf.create(checkpoint["cfg"])
+
+    # Prepare everythin required to make inference
+    quantizer = MidiQuantizer(
+        n_dstart_bins=train_cfg.dataset.quantization.dstart,
+        n_duration_bins=train_cfg.dataset.quantization.duration,
+        n_velocity_bins=train_cfg.dataset.quantization.velocity,
+    )
+    src_encoder = QuantizedMidiEncoder(train_cfg.dataset.quantization)
+    tgt_encoder = VelocityEncoder()
 
     st.markdown("Model parameters:")
     st.table(params)
 
-    dev = torch.device(cfg.device)
-    n_dstart_bins, n_duration_bins, n_velocity_bins = train_cfg.dataset.bins.split(" ")
-    hf_dataset = load_dataset(cfg.dataset.dataset_name, split=cfg.dataset_split)
+    dataset_name = st.text_input(label="dataset", value=train_cfg.dataset_name)
+    split = st.text_input(label="split", value="test")
+    record_id = st.number_input(label="record id", value=0)
+    hf_dataset = load_dataset(dataset_name, split=split)
 
-    if cfg.dataset.dataset_name == "roszcz/maestro-v1":
-        pieces_names = zip(hf_dataset["composer"], hf_dataset["title"])
-        with st.sidebar:
-            composer, title = st.selectbox(
-                label="piece",
-                options=[composer + "    " + title for composer, title in pieces_names],
-            ).split("    ")
+    # Select one full piece
+    record = hf_dataset[record_id]
+    piece = MidiPiece.from_huggingface(record)
 
-        one_record_dataset = hf_dataset.filter(lambda x: x["composer"] == composer and x["title"] == title)
-        midi_filename = composer + " " + title + ".mid"
-    else:
-        with st.sidebar:
-            midi_filename = st.selectbox(label="piece", options=[filename for filename in hf_dataset["midi_filename"]])
-        one_record_dataset = hf_dataset.filter(lambda x: x["midi_filename"] == midi_filename)
+    # And run full pre-processing ...
+    qpiece = quantizer.inject_quantization_features(piece)
+    sequences = quantized_piece_to_records(
+        piece=qpiece,
+        sequence_len=train_cfg.dataset.sequence_len,
+        sequence_step=train_cfg.dataset.sequence_len,
+    )
+    one_record_dataset = Dataset.from_list(sequences)
 
+    # ... to get it into a format the model understands
     dataset = MyTokenizedMidiDataset(
         dataset=one_record_dataset,
-        n_dstart_bins=int(n_dstart_bins),
-        n_duration_bins=int(n_duration_bins),
-        n_velocity_bins=int(n_velocity_bins),
-        sequence_len=train_cfg.dataset.sequence_size,
+        src_encoder=src_encoder,
+        tgt_encoder=tgt_encoder,
+        dataset_cfg=train_cfg.dataset,
     )
 
-    input_size = len(dataset.src_vocab)
-    output_size = len(dataset.tgt_vocab)
-
+    src_vocab_size, tgt_vocab_size = vocab_sizes(train_cfg)
     model = make_model(
-        input_size=input_size,
-        output_size=output_size,
+        src_vocab_size=src_vocab_size,
+        tgt_vocab_size=tgt_vocab_size,
         n=train_cfg.model.n,
         d_model=train_cfg.model.d_model,
         d_ff=train_cfg.model.d_ff,
@@ -69,10 +80,10 @@ def predict_piece_dashboard(cfg: DictConfig):
     model.load_state_dict(checkpoint["model_state_dict"])
     model.to(dev)
 
-    pad_idx = dataset.tgt_vocab.index("<blank>")
+    pad_idx = src_encoder.token_to_id["<blank>"]
 
     criterion = LabelSmoothing(
-        size=output_size,
+        size=tgt_vocab_size,
         padding_idx=pad_idx,
         smoothing=train_cfg.train.label_smoothing,
     )
@@ -81,52 +92,39 @@ def predict_piece_dashboard(cfg: DictConfig):
     total_loss = 0
     total_dist = 0
 
-    piece = MidiPiece.from_huggingface(one_record_dataset[0])
-
-    piece.source["midi_filename"] = midi_filename
-
-    predicted_piece_df = piece.df.copy()
     predicted_tokens = []
-    idx = 0
     for record in tqdm(dataset):
-        idx += 1
-        if idx % 2 == 0:
-            continue
+        src_token_ids = record["source_token_ids"]
+        tgt_token_ids = record["target_token_ids"]
+        src_mask = (src_token_ids != pad_idx).unsqueeze(-2)
 
-        pad_idx = dataset.tgt_vocab.index("<blank>")
-        src_mask = (record[0] != pad_idx).unsqueeze(-2)
-
-        decoded, out = decode_and_output(
+        predicted_token_ids, probabilities = decode_and_output(
             model=model,
-            src=record[0],
+            src=src_token_ids,
             src_mask=src_mask[0],
-            max_len=train_cfg.dataset.sequence_size,
+            max_len=train_cfg.dataset.sequence_len,
             start_symbol=0,
-            device=cfg.device,
+            device=dev,
         )
 
-        out_tokens = [dataset.tgt_vocab[x] for x in decoded if x != pad_idx]
+        out_tokens = [tgt_encoder.vocab[x] for x in predicted_token_ids if x != pad_idx]
         predicted_tokens += out_tokens
 
-        target = record[1][1:-1].to(dev)
+        target = tgt_token_ids[1:-1].to(dev)
         n_tokens = (target != pad_idx).data.sum()
-        loss = criterion(out, target) / n_tokens
+        loss = criterion(probabilities, target) / n_tokens
         total_loss += loss.item()
-        total_dist += calculate_average_distance(out, target).cpu()
+        total_dist += calculate_average_distance(probabilities, target).cpu()
 
-    pred_velocities = dataset.tokenizer_tgt.untokenize(predicted_tokens)
+    pred_velocities = tgt_encoder.untokenize(predicted_tokens)
+
+    predicted_piece_df = piece.df.copy()
     predicted_piece_df = predicted_piece_df.head(len(pred_velocities))
 
     predicted_piece_df["velocity"] = pred_velocities.fillna(0)
     predicted_piece = MidiPiece(predicted_piece_df)
 
     predicted_piece.source = piece.source.copy()
-    midi_filename = midi_filename.split(".")[0].replace("/", "-")
-    predicted_piece.source["midi_filename"] = f"tmp/dashboard/{train_cfg.run_name}/{midi_filename}-pred.mid"
-    piece.source["midi_filename"] = f"tmp/dashboard/common/{midi_filename}.mid"
-
-    pred_paths = piece_av_files(predicted_piece)
-    paths = piece_av_files(piece)
 
     cols = st.columns(2)
 
@@ -138,10 +136,21 @@ def predict_piece_dashboard(cfg: DictConfig):
 
     print(f"{avg_loss:6.2f}, {avg_dist:6.2f}")
 
+    # Render audio and video
+    model_dir = f"tmp/dashboard/{train_cfg.run_name}"
+    if not os.path.exists(model_dir):
+        os.mkdir(model_dir)
+
+    save_base_pred = f"{dataset_name}-{split}-{record_id}".replace("/", "_")
+    save_base_pred = os.path.join(model_dir, save_base_pred)
+    pred_paths = piece_av_files(predicted_piece, save_base=save_base_pred)
+
+    save_base_gt = save_base_pred + "-gt"
+    gt_paths = piece_av_files(piece, save_base=save_base_gt)
     with cols[0]:
         st.markdown("### True")
-        st.image(paths["pianoroll_path"])
-        st.audio(paths["mp3_path"])
+        st.image(gt_paths["pianoroll_path"])
+        st.audio(gt_paths["mp3_path"])
         st.table(piece.source)
     with cols[1]:
         st.markdown("### Predicted")

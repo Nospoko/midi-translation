@@ -119,7 +119,12 @@ def greedy_decode(
 
 
 def decode_and_output(
-    model: nn.Module, src: torch.Tensor, src_mask: torch.Tensor, max_len: int, start_symbol: int, device: str = "cpu"
+    model: nn.Module,
+    src: torch.Tensor,
+    src_mask: torch.Tensor,
+    max_len: int,
+    start_symbol: int,
+    device: str = "cpu",
 ) -> tuple[torch.Tensor, torch.Tensor]:
     dev = torch.device(device)
     # Pretend to be batches
@@ -140,5 +145,6 @@ def decode_and_output(
 
         sentence = torch.cat([sentence, torch.Tensor([[next_word]]).type_as(src.data).to(dev)], dim=1)
         probabilities = torch.cat([probabilities, prob], dim=0)
+
     # Don't pretend to be a batch
     return sentence[0], probabilities
