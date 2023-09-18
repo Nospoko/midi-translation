@@ -1,7 +1,10 @@
 import os
+import re
 import glob
+import json
+import uuid
+import base64
 
-import hydra
 import torch
 import pandas as pd
 import streamlit as st
@@ -9,7 +12,6 @@ from tqdm import tqdm
 from fortepyan import MidiPiece
 from omegaconf import OmegaConf
 from datasets import Dataset, load_dataset
-from hydra.core.global_hydra import GlobalHydra
 
 from model import make_model
 from data.quantizer import MidiQuantizer
@@ -126,8 +128,6 @@ def predict_piece_dashboard():
 
     predicted_piece.source = piece.source.copy()
 
-    cols = st.columns(2)
-
     # multiply by two because we use only half of the dataset samples
     avg_loss = 2 * total_loss / len(dataset)
     avg_dist = 2 * total_dist / len(dataset)
@@ -147,23 +147,109 @@ def predict_piece_dashboard():
 
     save_base_gt = save_base_pred + "-gt"
     gt_paths = piece_av_files(piece, save_base=save_base_gt)
+
+    st.json(piece.source)
+
+    cols = st.columns(2)
     with cols[0]:
-        st.markdown("### True")
+        st.markdown("### Original")
         st.image(gt_paths["pianoroll_path"])
         st.audio(gt_paths["mp3_path"])
-        st.table(piece.source)
+
+        midi_path = gt_paths["midi_path"]
+        with open(midi_path, "rb") as file:
+            download_button_str = download_button(
+                object_to_download=file.read(),
+                download_filename=midi_path.split("/")[-1],
+                button_text="Download original recording",
+            )
+            st.markdown(download_button_str, unsafe_allow_html=True)
+
     with cols[1]:
-        st.markdown("### Predicted")
+        st.markdown("### Generated")
         st.image(pred_paths["pianoroll_path"])
         st.audio(pred_paths["mp3_path"])
-        st.table(predicted_piece.source)
+
+        midi_path = pred_paths["midi_path"]
+        with open(midi_path, "rb") as file:
+            download_button_str = download_button(
+                object_to_download=file.read(),
+                download_filename=midi_path.split("/")[-1],
+                button_text="Download generated recording",
+            )
+            st.markdown(download_button_str, unsafe_allow_html=True)
 
 
-@hydra.main(version_base=None, config_path="config", config_name="dashboard_conf")
-def main(cfg):
-    GlobalHydra.instance().clear()
-    predict_piece_dashboard(cfg)
+def download_button(object_to_download, download_filename, button_text):
+    """
+    Generates a link to download the given object_to_download.
+    Params:
+    ------
+    object_to_download:  The object to be downloaded.
+    download_filename (str): filename and extension of file. e.g. mydata.csv,
+    some_txt_output.txt download_link_text (str): Text to display for download
+    link.
+    button_text (str): Text to display on download button (e.g. 'click here to download file')
+    pickle_it (bool): If True, pickle file.
+    Returns:
+    -------
+    (str): the anchor tag to download object_to_download
+    Examples:
+    --------
+    download_link(your_df, 'YOUR_DF.csv', 'Click to download data!')
+    download_link(your_str, 'YOUR_STRING.txt', 'Click to download text!')
+    """
+    if isinstance(object_to_download, bytes):
+        pass
 
+    elif isinstance(object_to_download, pd.DataFrame):
+        object_to_download = object_to_download.to_csv(index=False)
 
-if __name__ == "__main__":
-    main()
+    # Try JSON encode for everything else
+    else:
+        object_to_download = json.dumps(object_to_download)
+
+    try:
+        # some strings <-> bytes conversions necessary here
+        b64 = base64.b64encode(object_to_download.encode()).decode()
+
+    except AttributeError:
+        b64 = base64.b64encode(object_to_download).decode()
+
+    button_uuid = str(uuid.uuid4()).replace("-", "")
+    button_id = re.sub(r"\d+", "", button_uuid)
+
+    custom_css = f"""
+        <style>
+            #{button_id} {{
+                background-color: rgb(255, 255, 255);
+                color: rgb(38, 39, 48);
+                padding: 0.25em 0.38em;
+                position: relative;
+                text-decoration: none;
+                border-radius: 4px;
+                border-width: 1px;
+                border-style: solid;
+                border-color: rgb(230, 234, 241);
+                border-image: initial;
+            }}
+            #{button_id}:hover {{
+                border-color: rgb(246, 51, 102);
+                color: rgb(246, 51, 102);
+            }}
+            #{button_id}:active {{
+                box-shadow: none;
+                background-color: rgb(246, 51, 102);
+                color: white;
+                }}
+        </style> """
+
+    a_html = f"""
+    <a download="{download_filename}" id="{button_id}" href="data:file/txt;base64,{b64}">
+        {button_text}
+    </a>
+    <br></br>
+    """
+    button_html = custom_css + a_html
+
+    return button_html

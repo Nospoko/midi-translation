@@ -1,6 +1,7 @@
 import os
 
 import torch
+import pretty_midi
 import pandas as pd
 import torch.nn as nn
 import fortepyan as ff
@@ -37,8 +38,19 @@ def piece_av_files(piece: MidiPiece, save_base: str) -> dict:
         plt.savefig(pianoroll_path)
         plt.clf()
 
+    midi_path = save_base + ".mid"
+    if not os.path.exists(midi_path):
+        # Add an silent event to make sure the final notes
+        # have time to ring out
+        midi = piece.to_midi()
+        end_time = midi.get_end_time() + 0.2
+        pedal_off = pretty_midi.ControlChange(64, 0, end_time)
+        midi.instruments[0].control_changes.append(pedal_off)
+        midi.write(midi_path)
+
     paths = {
         "mp3_path": mp3_path,
+        "midi_path": midi_path,
         "pianoroll_path": pianoroll_path,
     }
     return paths
