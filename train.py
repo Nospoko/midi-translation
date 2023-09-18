@@ -13,9 +13,9 @@ from torch.optim.lr_scheduler import LambdaLR
 import wandb
 from data.batch import Batch
 from model import make_model
-from data.dataset import TokenizedMidiDataset
+from data.dataset import TokenizedMidiDataset, load_cached_dataset
 from modules.label_smoothing import LabelSmoothing
-from utils import avg_distance, load_cached_dataset, learning_rate_schedule
+from utils import avg_distance, learning_rate_schedule
 
 
 @hydra.main(version_base=None, config_path="config", config_name="conf")

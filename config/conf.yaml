@@ -11,7 +11,7 @@ dataset:
   dataset_name: 'roszcz/maestro-v1'
   bins: "3 3 3"
   sequence_size: 128
-  n_tgt_dstart_bins: 100
+  tgt_bins: 100
 
 device: "cpu"
 warmup: 3000

@@ -7,7 +7,7 @@ from torch.utils.data import DataLoader
 
 from train import val_epoch
 from model import make_model
-from utils import load_cached_dataset
+from data.dataset import load_cached_dataset
 from modules.label_smoothing import LabelSmoothing
 
 

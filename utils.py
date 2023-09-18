@@ -1,18 +1,13 @@
 import os
-import json
-import pickle
-import hashlib
 
 import torch
 import torch.nn as nn
 import fortepyan as ff
 import matplotlib.pyplot as plt
 from fortepyan import MidiPiece
-from datasets import load_dataset
-from omegaconf import OmegaConf, DictConfig
 from fortepyan.audio import render as render_audio
 # BinsToVelocity and BinsToDstart datasets must be imported to use eval(cfg.dataset_class) in load_cached_dataset
-from data.dataset import TokenizedMidiDataset, BinsToVelocityDataset, BinsToDstartDataset
+from data.dataset import TokenizedMidiDataset
 from modules.encoderdecoder import subsequent_mask
 
 
@@ -57,51 +52,6 @@ def learning_rate_schedule(step: int, model_size: int, factor: float, warmup: in
     if step == 0:
         step = 1
     return factor * (model_size ** (-0.5) * min(step ** (-0.5), step * warmup ** (-1.5)))
-
-
-def load_cached_dataset(
-    cfg: DictConfig,
-    split: str = "test",
-) -> TokenizedMidiDataset:
-    n_dstart_bins, n_duration_bins, n_velocity_bins = cfg.bins.split(" ")
-    n_dstart_bins, n_duration_bins, n_velocity_bins = int(n_dstart_bins), int(n_duration_bins), int(n_velocity_bins)
-
-    config_hash = hashlib.sha256()
-    config_string = json.dumps(OmegaConf.to_container(cfg)) + split
-    config_hash.update(config_string.encode())
-    config_hash = config_hash.hexdigest()
-    cache_dir = "tmp/datasets"
-    print(f"Preparing dataset: {config_hash}")
-    try:
-        dataset_cache_file = f"{config_hash}.pkl"
-        dataset_cache_path = os.path.join(cache_dir, dataset_cache_file)
-
-        if os.path.exists(dataset_cache_path):
-            file = open(dataset_cache_path, "rb")
-            dataset = pickle.load(file)
-
-        else:
-            file = open(dataset_cache_path, "wb")
-            hf_dataset = load_dataset(cfg.dataset_name, split=split)
-
-            args = [hf_dataset, n_dstart_bins, n_velocity_bins, n_duration_bins, cfg.sequence_size]
-            try:
-                if cfg.dataset_class == "BinsToDstartDataset":
-                    args.append(cfg.n_tgt_dstart_bins)
-            finally:
-                pass
-
-            dataset = eval(cfg.dataset_class)(*args)
-            pickle.dump(dataset, file)
-
-        file.close()
-
-    except (EOFError, ConnectionError, UnboundLocalError):
-        file.close()
-        os.remove(path=dataset_cache_path)
-        dataset = load_cached_dataset(cfg, split)
-
-    return dataset
 
 
 def predict_sample(record, dataset: TokenizedMidiDataset, model, cfg, train_cfg):

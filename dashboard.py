@@ -12,10 +12,10 @@ from omegaconf import OmegaConf, DictConfig
 from hydra.core.global_hydra import GlobalHydra
 
 from model import make_model
-from evals.evaluate import load_cached_dataset
 from utils import piece_av_files, predict_sample
 from predict_piece import predict_piece_dashboard
-from data.dataset import BinsToDstartDataset, TokenizedMidiDataset, BinsToVelocityDataset
+from data.dataset import BinsToDstartDataset, TokenizedMidiDataset, BinsToVelocityDataset, load_cached_dataset
+
 
 @hydra.main(version_base=None, config_path="config", config_name="dashboard_conf")
 def main(cfg: DictConfig):
