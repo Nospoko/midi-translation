@@ -23,7 +23,7 @@ from utils import vocab_sizes, piece_av_files, decode_and_output, calculate_aver
 
 @torch.no_grad()
 def predict_piece_dashboard():
-    dev = torch.device("cpu")
+    dev = torch.device("cuda")
 
     with st.sidebar:
         model_path = st.selectbox(label="model", options=glob.glob("models/*.pt"))
@@ -161,7 +161,7 @@ def predict_piece_dashboard():
             download_button_str = download_button(
                 object_to_download=file.read(),
                 download_filename=midi_path.split("/")[-1],
-                button_text="Download original recording",
+                button_text="Download original midi",
             )
             st.markdown(download_button_str, unsafe_allow_html=True)
 
@@ -175,11 +175,12 @@ def predict_piece_dashboard():
             download_button_str = download_button(
                 object_to_download=file.read(),
                 download_filename=midi_path.split("/")[-1],
-                button_text="Download generated recording",
+                button_text="Download generated midi",
             )
             st.markdown(download_button_str, unsafe_allow_html=True)
 
 
+# TODO Move this to some kind of dashboard utils
 def download_button(object_to_download, download_filename, button_text):
     """
     Generates a link to download the given object_to_download.
