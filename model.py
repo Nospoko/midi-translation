@@ -13,14 +13,14 @@ from modules.encoderdecoder import Generator, EncoderDecoder, subsequent_mask
 
 
 def make_model(
-    input_size: int,
-    output_size: int,
+    src_vocab_size: int,
+    tgt_vocab_size: int,
     n: int = 6,
     d_model: int = 512,
     d_ff: int = 2048,
     h: int = 8,
     dropout: float = 0.1,
-) -> nn.Module:
+) -> EncoderDecoder:
     """Helper: Construct a model from hyperparameters."""
     c = copy.deepcopy
     attn = MultiHeadedAttention(h=h, d_model=d_model)
@@ -31,9 +31,9 @@ def make_model(
         decoder=Decoder(
             DecoderLayer(size=d_model, self_attn=c(attn), src_attn=c(attn), feed_forward=c(ff), dropout=dropout), n=n
         ),
-        src_embed=nn.Sequential(Embeddings(d_model=d_model, vocab_size=input_size), c(position)),
-        tgt_embed=nn.Sequential(Embeddings(d_model=d_model, vocab_size=output_size), c(position)),
-        generator=Generator(d_model, output_size),
+        src_embed=nn.Sequential(Embeddings(d_model=d_model, vocab_size=src_vocab_size), c(position)),
+        tgt_embed=nn.Sequential(Embeddings(d_model=d_model, vocab_size=tgt_vocab_size), c(position)),
+        generator=Generator(d_model, tgt_vocab_size),
     )
 
     # This was important from their code.

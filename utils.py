@@ -1,30 +1,36 @@
 import os
-import json
-import pickle
-import hashlib
 
 import torch
+import pretty_midi
+import pandas as pd
 import torch.nn as nn
 import fortepyan as ff
 import matplotlib.pyplot as plt
 from fortepyan import MidiPiece
-from datasets import load_dataset
-from omegaconf import OmegaConf, DictConfig
+from omegaconf import DictConfig
 from fortepyan.audio import render as render_audio
 
-from data.dataset import BinsToVelocityDataset
+from data.tokenizer import MidiEncoder
 from modules.encoderdecoder import subsequent_mask
 
 
-def piece_av_files(piece: MidiPiece) -> dict:
-    # stolen from Tomek
-    midi_file = piece.source["midi_filename"]
-    mp3_path = midi_file.replace(".midi", ".mp3").replace(".mid", ".mp3")
+def vocab_sizes(cfg: DictConfig) -> tuple[int, int]:
+    bins = cfg.dataset.quantization
+
+    # +3 is for special tokens we don't really use right now
+    tgt_vocab_size = 128 + 3
+    src_vocab_size = 3 + 88 * bins.dstart * bins.velocity * bins.duration
+    return src_vocab_size, tgt_vocab_size
+
+
+def piece_av_files(piece: MidiPiece, save_base: str) -> dict:
+    # fixed by Tomek
+    mp3_path = save_base + ".mp3"
 
     if not os.path.exists(mp3_path):
         render_audio.midi_to_mp3(piece.to_midi(), mp3_path)
 
-    pianoroll_path = midi_file.replace(".midi", ".png").replace(".mid", ".png")
+    pianoroll_path = save_base + ".png"
 
     if not os.path.exists(pianoroll_path):
         ff.view.draw_pianoroll_with_velocities(piece)
@@ -32,8 +38,19 @@ def piece_av_files(piece: MidiPiece) -> dict:
         plt.savefig(pianoroll_path)
         plt.clf()
 
+    midi_path = save_base + ".mid"
+    if not os.path.exists(midi_path):
+        # Add an silent event to make sure the final notes
+        # have time to ring out
+        midi = piece.to_midi()
+        end_time = midi.get_end_time() + 0.2
+        pedal_off = pretty_midi.ControlChange(64, 0, end_time)
+        midi.instruments[0].control_changes.append(pedal_off)
+        midi.write(midi_path)
+
     paths = {
         "mp3_path": mp3_path,
+        "midi_path": midi_path,
         "pianoroll_path": pianoroll_path,
     }
     return paths
@@ -45,7 +62,7 @@ def euclidean_distance(out: torch.Tensor, tgt: torch.Tensor):
     return torch.dist(labels, tgt.to(float), p=2)
 
 
-def avg_distance(out: torch.Tensor, tgt: torch.Tensor) -> torch.Tensor:
+def calculate_average_distance(out: torch.Tensor, tgt: torch.Tensor) -> torch.Tensor:
     labels = out.argmax(1).to(float)
     # average distance between label and target
     return torch.dist(labels, tgt.to(float), p=1) / len(labels)
@@ -59,62 +76,37 @@ def learning_rate_schedule(step: int, model_size: int, factor: float, warmup: in
     return factor * (model_size ** (-0.5) * min(step ** (-0.5), step * warmup ** (-1.5)))
 
 
-def load_cached_dataset(cfg: DictConfig, split="test") -> BinsToVelocityDataset:
-    n_dstart_bins, n_duration_bins, n_velocity_bins = cfg.bins.split(" ")
-    n_dstart_bins, n_duration_bins, n_velocity_bins = int(n_dstart_bins), int(n_duration_bins), int(n_velocity_bins)
-
-    config_hash = hashlib.sha256()
-    config_string = json.dumps(OmegaConf.to_container(cfg)) + split
-    config_hash.update(config_string.encode())
-    config_hash = config_hash.hexdigest()
-    cache_dir = "tmp/datasets"
-    print(f"Preparing dataset: {config_hash}")
-    try:
-        dataset_cache_file = f"{config_hash}.pkl"
-        dataset_cache_path = os.path.join(cache_dir, dataset_cache_file)
-
-        if os.path.exists(dataset_cache_path):
-            file = open(dataset_cache_path, "rb")
-            dataset = pickle.load(file)
-        else:
-            file = open(dataset_cache_path, "wb")
-            hf_dataset = load_dataset(cfg.dataset_name, split=split)
-            dataset = BinsToVelocityDataset(
-                dataset=hf_dataset,
-                n_dstart_bins=n_dstart_bins,
-                n_velocity_bins=n_velocity_bins,
-                n_duration_bins=n_duration_bins,
-                sequence_len=cfg.sequence_size,
-            )
-            pickle.dump(dataset, file)
-        file.close()
-    except (EOFError, UnboundLocalError):
-        file.close()
-        os.remove(path=dataset_cache_path)
-        load_cached_dataset(cfg, split)
-    return dataset
-
-
-def predict_sample(record, dataset: BinsToVelocityDataset, model, cfg, train_cfg) -> list[str]:
-    pad_idx = dataset.tgt_vocab.index("<blank>")
-    src_mask = (record[0] != pad_idx).unsqueeze(-2)
+def generate_sequence(
+    src_tokens: torch.Tensor,
+    tgt_encoder: MidiEncoder,
+    pad_idx: int,
+    model: nn.Module,
+    sequence_size: int,
+    device: str = "cpu",
+) -> pd.DataFrame:
+    src_mask = (src_tokens != pad_idx).unsqueeze(-2)
 
     sequence = greedy_decode(
         model=model,
-        src=record[0],
+        src=src_tokens,
         src_mask=src_mask,
-        max_len=train_cfg.dataset.sequence_size,
+        max_len=sequence_size,
         start_symbol=0,
-        device=cfg.device,
+        device=device,
     )
 
-    out_tokens = [dataset.tgt_vocab[x] for x in sequence if x != pad_idx]
+    out_sequence = tgt_encoder.untokenize(sequence)
 
-    return out_tokens
+    return out_sequence
 
 
 def greedy_decode(
-    model: nn.Module, src: torch.Tensor, src_mask: torch.Tensor, max_len: int, start_symbol: int, device: str = "cpu"
+    model: nn.Module,
+    src: torch.Tensor,
+    src_mask: torch.Tensor,
+    max_len: int,
+    start_symbol: int,
+    device: str = "cpu",
 ) -> torch.Tensor:
     dev = torch.device(device)
     # Pretend to be batches
@@ -139,7 +131,12 @@ def greedy_decode(
 
 
 def decode_and_output(
-    model: nn.Module, src: torch.Tensor, src_mask: torch.Tensor, max_len: int, start_symbol: int, device: str = "cpu"
+    model: nn.Module,
+    src: torch.Tensor,
+    src_mask: torch.Tensor,
+    max_len: int,
+    start_symbol: int,
+    device: str = "cpu",
 ) -> tuple[torch.Tensor, torch.Tensor]:
     dev = torch.device(device)
     # Pretend to be batches
@@ -160,5 +157,6 @@ def decode_and_output(
 
         sentence = torch.cat([sentence, torch.Tensor([[next_word]]).type_as(src.data).to(dev)], dim=1)
         probabilities = torch.cat([probabilities, prob], dim=0)
+
     # Don't pretend to be a batch
     return sentence[0], probabilities

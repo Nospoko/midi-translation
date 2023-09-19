@@ -59,7 +59,6 @@ device: "cpu"
 warmup: 3000
 log_frequency: 10
 file_prefix: "to_vel"
-model_path: "to_vel_final.pt"
 run_name: midi-transformer-${now:%Y-%m-%d-%H-%M}
 project: "midi-transformer"
 
@@ -80,12 +79,9 @@ maestro-v1 dataset as well as on giant-midi-sustain.
 
 To start the dashboard you need to run streamlit.
 
-You can choose which dataset you would like to use by setting dataset.dataset_name parameter
-
-If you are using roszcz/giant-midi-sustain you also need to change dataset_split parameter to "train", for example:
 ```shell
-streamlit run --server.port 4466 dashboard.py dataset.dataset_name="roszcz/giant-midi-sustain" "dataset_split='train[10%]'"
-
+# Streamlit has issues with accepting it's run in the root directory
+PYTHONPATH=. streamlit run --server.port 4466 dashboard/main.py
 ```
 
 #### Tokenization review dashboard
@@ -118,4 +114,25 @@ You can run:
 
 ```shell
 python evaluate.py run_name="2023-08-31-14-38" dataset.dataset_name="roszcz/maestro-v1-sustain"
+```
+
+
+### Code Style
+
+This repository uses pre-commit hooks with forced python formatting ([black](https://github.com/psf/black),
+[flake8](https://flake8.pycqa.org/en/latest/), and [isort](https://pycqa.github.io/isort/)):
+
+```sh
+pip install pre-commit
+pre-commit install
+```
+
+Whenever you execute `git commit` the files altered / added within the commit will be checked and corrected.
+`black` and `isort` can modify files locally - if that happens you have to `git add` them again.
+You might also be prompted to introduce some fixes manually.
+
+To run the hooks against all files without running `git commit`:
+
+```sh
+pre-commit run --all-files
 ```

@@ -15,7 +15,6 @@ class MidiQuantizer:
         self.n_dstart_bins = n_dstart_bins
         self.n_duration_bins = n_duration_bins
         self.n_velocity_bins = n_velocity_bins
-        self.samples = []
         self._build()
 
     def __rich_repr__(self):
@@ -40,14 +39,24 @@ class MidiQuantizer:
         self.duration_bin_edges = bin_edges["duration"][self.n_duration_bins]
         self.velocity_bin_edges = bin_edges["velocity"][self.n_velocity_bins]
 
-    def quantize_piece(self, piece: MidiPiece) -> MidiPiece:
+    def inject_quantization_features(self, piece: MidiPiece) -> MidiPiece:
         # Try not to overwrite anything
         df = piece.df.copy()
-        self.samples.append(df)
         source = dict(piece.source) | {"quantized": True}
 
         # Make the quantization
         df = self.quantize_frame(df)
+        out = MidiPiece(df=df, source=source)
+        return out
+
+    def quantize_piece(self, piece: MidiPiece) -> MidiPiece:
+        # Try not to overwrite anything
+        df = piece.df.copy()
+        source = dict(piece.source) | {"quantized": True}
+
+        # Make the quantization
+        df = self.quantize_frame(df)
+        df = self.apply_quantization(df)
         out = MidiPiece(df=df, source=source)
         return out
 
@@ -58,7 +67,6 @@ class MidiQuantizer:
         df["duration_bin"] = np.digitize(df.duration, self.duration_bin_edges) - 1
         df["velocity_bin"] = np.digitize(df.velocity, self.velocity_bin_edges) - 1
 
-        df = self.apply_quantization(df)
         return df
 
     def apply_quantization(self, df: pd.DataFrame) -> pd.DataFrame:
