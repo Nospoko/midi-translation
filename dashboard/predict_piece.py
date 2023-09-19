@@ -1,17 +1,15 @@
 import os
-import glob
 
 import torch
-import pandas as pd
+import torch.nn as nn
 import streamlit as st
 from tqdm import tqdm
 from fortepyan import MidiPiece
-from omegaconf import OmegaConf
+from omegaconf import DictConfig
 from datasets import Dataset, load_dataset
 
-from model import make_model
 from data.quantizer import MidiQuantizer
-from dashboard.utils import download_button
+from dashboard.components import download_button
 from modules.label_smoothing import LabelSmoothing
 from data.tokenizer import VelocityEncoder, QuantizedMidiEncoder
 from data.dataset import MyTokenizedMidiDataset, quantized_piece_to_records
@@ -19,16 +17,7 @@ from utils import vocab_sizes, piece_av_files, decode_and_output, calculate_aver
 
 
 @torch.no_grad()
-def predict_piece_dashboard():
-    dev = torch.device("cuda")
-
-    with st.sidebar:
-        model_path = st.selectbox(label="model", options=glob.glob("models/*.pt"))
-
-    checkpoint = torch.load(model_path, map_location=dev)
-    params = pd.DataFrame(checkpoint["cfg"]["model"], index=[0])
-    train_cfg = OmegaConf.create(checkpoint["cfg"])
-
+def predict_piece_dashboard(model: nn.Module, train_cfg: DictConfig):
     # Prepare everythin required to make inference
     quantizer = MidiQuantizer(
         n_dstart_bins=train_cfg.dataset.quantization.dstart,
@@ -38,13 +27,6 @@ def predict_piece_dashboard():
     src_encoder = QuantizedMidiEncoder(train_cfg.dataset.quantization)
     tgt_encoder = VelocityEncoder()
 
-    st.markdown("Model parameters:")
-    st.table(params)
-
-    dataset_params = OmegaConf.to_container(train_cfg.dataset)
-    st.markdown("Dataset config:")
-    st.json(dataset_params, expanded=True)
-
     dataset_name = st.text_input(label="dataset", value=train_cfg.dataset_name)
     split = st.text_input(label="split", value="test")
     record_id = st.number_input(label="record id", value=0)
@@ -53,6 +35,8 @@ def predict_piece_dashboard():
     # Select one full piece
     record = hf_dataset[record_id]
     piece = MidiPiece.from_huggingface(record)
+    # Crazy experiment
+    # piece.df.velocity = np.random.randint(128, size=piece.size)
 
     # And run full pre-processing ...
     qpiece = quantizer.inject_quantization_features(piece)
@@ -71,26 +55,15 @@ def predict_piece_dashboard():
         dataset_cfg=train_cfg.dataset,
     )
 
-    src_vocab_size, tgt_vocab_size = vocab_sizes(train_cfg)
-    model = make_model(
-        src_vocab_size=src_vocab_size,
-        tgt_vocab_size=tgt_vocab_size,
-        n=train_cfg.model.n,
-        d_model=train_cfg.model.d_model,
-        d_ff=train_cfg.model.d_ff,
-        dropout=train_cfg.model.dropout,
-    )
-    model.load_state_dict(checkpoint["model_state_dict"])
-    model.to(dev)
-
     pad_idx = src_encoder.token_to_id["<blank>"]
 
+    _, tgt_vocab_size = vocab_sizes(train_cfg)
     criterion = LabelSmoothing(
         size=tgt_vocab_size,
         padding_idx=pad_idx,
         smoothing=train_cfg.train.label_smoothing,
     )
-    criterion.to(dev)
+    criterion.to(train_cfg.device)
 
     total_loss = 0
     total_dist = 0
@@ -107,13 +80,13 @@ def predict_piece_dashboard():
             src_mask=src_mask[0],
             max_len=train_cfg.dataset.sequence_len,
             start_symbol=0,
-            device=dev,
+            device=train_cfg.device,
         )
 
         out_tokens = [tgt_encoder.vocab[x] for x in predicted_token_ids if x != pad_idx]
         predicted_tokens += out_tokens
 
-        target = tgt_token_ids[1:-1].to(dev)
+        target = tgt_token_ids[1:-1].to(train_cfg.device)
         n_tokens = (target != pad_idx).data.sum()
         loss = criterion(probabilities, target) / n_tokens
         total_loss += loss.item()
@@ -129,11 +102,10 @@ def predict_piece_dashboard():
 
     predicted_piece.source = piece.source.copy()
 
-    # multiply by two because we use only half of the dataset samples
-    avg_loss = 2 * total_loss / len(dataset)
-    avg_dist = 2 * total_dist / len(dataset)
-    predicted_piece.source["average_loss"] = f"{avg_loss:6.2f}"
-    predicted_piece.source["average_dist"] = f"{avg_dist:6.2f}"
+    avg_loss = total_loss / len(dataset)
+    avg_dist = total_dist / len(dataset)
+    st.markdown(f"Average loss: {avg_loss}")
+    st.markdown(f"Average distance: {avg_dist}")
 
     print(f"{avg_loss:6.2f}, {avg_dist:6.2f}")
 
@@ -179,6 +151,3 @@ def predict_piece_dashboard():
                 button_text="Download generated midi",
             )
             st.markdown(download_button_str, unsafe_allow_html=True)
-
-
-# TODO Move this to some kind of dashboard utils

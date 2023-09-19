@@ -5,50 +5,73 @@ import json
 import torch
 import numpy as np
 import pandas as pd
+import torch.nn as nn
 import streamlit as st
 from fortepyan import MidiPiece
-from omegaconf import OmegaConf
-from predict_piece import predict_piece_dashboard
+from omegaconf import OmegaConf, DictConfig
 
 from model import make_model
 from data.quantizer import MidiQuantizer
 from data.dataset import load_cache_dataset
+from dashboard.predict_piece import predict_piece_dashboard
 from utils import vocab_sizes, piece_av_files, generate_sequence
 
 # For now let's run all dashboards on CPU
-DEVICE = "cpu"
+DEVICE = "cuda:0"
 
 
 def main():
+    # Set the layout of the Streamlit page
+    st.set_page_config(layout="wide", page_title="Maestro Dataset", page_icon=":musical_keyboard")
+
     with st.sidebar:
-        mode = st.selectbox(label="Display", options=["Model predictions", "Predict piece"])
+        mode = st.selectbox(label="Display", options=["Sequence predictions", "Piece predictions"])
 
-    if mode == "Predict piece":
-        predict_piece_dashboard()
-    if mode == "Model predictions":
-        model_predictions_review()
-
-
-def model_predictions_review():
     with st.sidebar:
-        # options
-        path = st.selectbox(label="model", options=glob.glob("models/*.pt"))
+        # Show available checkpoints
+        checkpoint_path = st.selectbox(label="model", options=glob.glob("models/*.pt"))
         st.markdown("Selected checkpoint:")
-        st.markdown(path)
+        st.markdown(checkpoint_path)
 
-    # load checkpoint, force dashboard device
-    checkpoint = torch.load(path, map_location=DEVICE)
+    # Load:
+    checkpoint = torch.load(checkpoint_path, map_location=DEVICE)
+
+    # - original config
     train_cfg = OmegaConf.create(checkpoint["cfg"])
     train_cfg.device = DEVICE
 
+    # - - for model
     st.markdown("Model config:")
     model_params = OmegaConf.to_container(train_cfg.model)
     st.json(model_params, expanded=False)
 
+    # - - for dataset
     dataset_params = OmegaConf.to_container(train_cfg.dataset)
     st.markdown("Dataset config:")
     st.json(dataset_params, expanded=True)
 
+    # - model
+    src_vocab_size, tgt_vocab_size = vocab_sizes(train_cfg)
+    model = make_model(
+        src_vocab_size=src_vocab_size,
+        tgt_vocab_size=tgt_vocab_size,
+        n=train_cfg.model.n,
+        d_model=train_cfg.model.d_model,
+        d_ff=train_cfg.model.d_ff,
+        h=train_cfg.model.h,
+        dropout=train_cfg.model.dropout,
+    )
+    model.load_state_dict(checkpoint["model_state_dict"])
+    model.eval().to(DEVICE)
+
+    if mode == "Piece predictions":
+        predict_piece_dashboard(model, train_cfg)
+    if mode == "Sequence predictions":
+        model_predictions_review(model, train_cfg)
+
+
+def model_predictions_review(model: nn.Module, train_cfg: DictConfig):
+    # load checkpoint, force dashboard device
     dataset_cfg = train_cfg.dataset
     dataset_name = st.text_input(label="dataset", value=train_cfg.dataset_name)
     split = st.text_input(label="split", value="test")
@@ -67,19 +90,6 @@ def model_predictions_review():
         dataset_cfg=dataset_cfg,
         split=split,
     )
-    src_vocab_size, tgt_vocab_size = vocab_sizes(train_cfg)
-
-    model = make_model(
-        src_vocab_size=src_vocab_size,
-        tgt_vocab_size=tgt_vocab_size,
-        n=train_cfg.model.n,
-        d_model=train_cfg.model.d_model,
-        d_ff=train_cfg.model.d_ff,
-        h=train_cfg.model.h,
-        dropout=train_cfg.model.dropout,
-    )
-    model.load_state_dict(checkpoint["model_state_dict"])
-    model.to(DEVICE)
 
     n_samples = 5
     np.random.seed(random_seed)
