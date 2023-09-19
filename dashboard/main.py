@@ -22,14 +22,16 @@ DEVICE = "cuda:0"
 
 def main():
     # Set the layout of the Streamlit page
-    st.set_page_config(layout="wide", page_title="Maestro Dataset", page_icon=":musical_keyboard")
+    st.set_page_config(layout="wide", page_title="Velocity Transformer", page_icon=":musical_keyboard")
 
     with st.sidebar:
         mode = st.selectbox(label="Display", options=["Sequence predictions", "Piece predictions"])
 
     with st.sidebar:
         # Show available checkpoints
-        checkpoint_path = st.selectbox(label="model", options=glob.glob("models/*.pt"))
+        options = glob.glob("models/*.pt")
+        options.sort()
+        checkpoint_path = st.selectbox(label="model", options=options)
         st.markdown("Selected checkpoint:")
         st.markdown(checkpoint_path)
 
@@ -64,6 +66,9 @@ def main():
     model.load_state_dict(checkpoint["model_state_dict"])
     model.eval().to(DEVICE)
 
+    n_parameters = sum(p.numel() for p in model.parameters()) / 1e6
+    st.markdown(f"Model parameters: {n_parameters:.3f}M")
+
     if mode == "Piece predictions":
         predict_piece_dashboard(model, train_cfg)
     if mode == "Sequence predictions":
@@ -97,14 +102,12 @@ def model_predictions_review(model: nn.Module, train_cfg: DictConfig):
 
     pad_idx = dataset.src_encoder.token_to_id["<blank>"]
 
-    cols = st.columns(5)
+    cols = st.columns(3)
     with cols[0]:
         st.markdown("### Unchanged")
     with cols[1]:
-        st.markdown("### Quantized")
-    with cols[2]:
         st.markdown("### Q. velocity")
-    with cols[3]:
+    with cols[2]:
         st.markdown("### Predicted")
 
     # predict velocities and get src, tgt and model output
@@ -117,6 +120,7 @@ def model_predictions_review(model: nn.Module, train_cfg: DictConfig):
 
         generated_velocity = generate_sequence(
             model=model,
+            device=DEVICE,
             pad_idx=pad_idx,
             src_tokens=src_token_ids,
             tgt_encoder=dataset.tgt_encoder,
@@ -162,9 +166,6 @@ def model_predictions_review(model: nn.Module, train_cfg: DictConfig):
         true_save_base = os.path.join(model_dir, f"true_{record_id}")
         true_piece_paths = piece_av_files(piece=true_piece, save_base=true_save_base)
 
-        src_save_base = os.path.join(model_dir, f"src_{record_id}")
-        src_piece_paths = piece_av_files(piece=quantized_piece, save_base=src_save_base)
-
         qv_save_base = os.path.join(model_dir, f"qv_{record_id}")
         qv_paths = piece_av_files(piece=quantized_vel_piece, save_base=qv_save_base)
 
@@ -173,23 +174,18 @@ def model_predictions_review(model: nn.Module, train_cfg: DictConfig):
 
         # create a dashboard
         st.json(record_source)
-        cols = st.columns(4)
+        cols = st.columns(3)
         with cols[0]:
             # Unchanged
             st.image(true_piece_paths["pianoroll_path"])
             st.audio(true_piece_paths["mp3_path"])
 
         with cols[1]:
-            # Quantized
-            st.image(src_piece_paths["pianoroll_path"])
-            st.audio(src_piece_paths["mp3_path"])
-
-        with cols[2]:
             # Q.velocity ?
             st.image(qv_paths["pianoroll_path"])
             st.audio(qv_paths["mp3_path"])
 
-        with cols[3]:
+        with cols[2]:
             # Predicted
             st.image(predicted_paths["pianoroll_path"])
             st.audio(predicted_paths["mp3_path"])

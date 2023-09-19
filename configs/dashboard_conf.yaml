@@ -1,7 +1,0 @@
-device: "cpu"
-
-dataset_split: "test"
-dataset:
-  dataset_name: "roszcz/maestro-v1-sustain"
-  bins: null
-  sequence_size: null

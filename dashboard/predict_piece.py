@@ -114,7 +114,7 @@ def predict_piece_dashboard(model: nn.Module, train_cfg: DictConfig):
     if not os.path.exists(model_dir):
         os.mkdir(model_dir)
 
-    save_base_pred = f"{dataset_name}-{split}-{record_id}".replace("/", "_")
+    save_base_pred = f"{dataset_name}-{split}-{record_id}-{train_cfg.run_name}".replace("/", "_")
     save_base_pred = os.path.join(model_dir, save_base_pred)
     pred_paths = piece_av_files(predicted_piece, save_base=save_base_pred)
 
