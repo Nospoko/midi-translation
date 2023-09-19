@@ -186,6 +186,8 @@ def tokenization_review_dashboard(cfg):
 
     indexes = torch.randint(0, len(dataset), [n_samples])
     for idx in indexes:
+        record = dataset.records[idx]
+        record["source"] = json.loads(record["source"])
         piece, quantized_piece = prepare_midi_pieces(
             record=dataset.records[idx],
             processed=dataset.records[idx],
