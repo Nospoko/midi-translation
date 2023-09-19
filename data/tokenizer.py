@@ -1,10 +1,16 @@
 import itertools
 
 import pandas as pd
+from hydra.utils import to_absolute_path
 from omegaconf import DictConfig
-
+from uaclient import yaml
+import numpy as np
+from data.quantizer import MidiQuantizer
 
 class MidiEncoder:
+    def __init__(self):
+        self.token_to_id = None
+
     def tokenize(self, record: dict) -> list[str]:
         raise NotImplementedError("Your encoder needs *tokenize* implementation")
 
@@ -118,5 +124,57 @@ class VelocityEncoder(MidiEncoder):
     def untokenize(self, tokens: list[str]) -> pd.DataFrame:
         velocities = [int(token) for token in tokens if token not in self.specials]
         df = pd.DataFrame(velocities, columns=["velocity"])
+
+        return df
+
+
+class DstartEncoder(MidiEncoder):
+    def __init__(self, bins: int = 200):
+
+        self.specials = ["<s>", "</s>", "<blank>"]
+        self.bins = bins
+        # Make a copy of special tokens ...
+        self.vocab = list(self.specials)
+        self.bin_edges = self.load_bin_edges()
+        # ... and add velocity tokens
+        self._build_vocab()
+        self.token_to_id = {token: it for it, token in enumerate(self.vocab)}
+
+    def load_bin_edges(self):
+        artifacts_path = to_absolute_path("artifacts/bin_edges.yaml")
+        with open(artifacts_path, "r") as f:
+            bin_edges = yaml.safe_load(f)
+
+        dstart_bin_edges = bin_edges["dstart"][self.bins]
+        return dstart_bin_edges
+
+    def _build_vocab(self):
+        self.vocab += [str(possible_bin) for possible_bin in range(self.bins)]
+
+    @property
+    def vocab_size(self) -> int:
+        return len(self.vocab)
+
+    def tokenize(self, record: dict) -> list[str]:
+        # TODO I don't love the idea of adding tokens durint *tokenize* call
+        # If we want to pretend that our midi sequences have start and finish
+        # we should take care of that before we get here :alarm:
+
+        df = pd.DataFrame(record)
+
+        # Quantize only dstart
+        df["next_start"] = df.start.shift(-1)
+        df["dstart"] = df.next_start - df.start
+        df["dstart_bin"] = np.digitize(df.dstart.fillna(0), self.bin_edges) - 1
+
+        # get tokens from quantized data
+        tokens = [str(dstart_bin) for dstart_bin in df["dstart_bin"]]
+
+        tokens = ["<s>"] + tokens + ["</s>"]
+        return tokens
+
+    def untokenize(self, tokens: list[str]) -> pd.DataFrame:
+        dstarts = [int(token) for token in tokens if token not in self.specials]
+        df = pd.DataFrame(dstarts, columns=["dstart_bin"])
 
         return df
