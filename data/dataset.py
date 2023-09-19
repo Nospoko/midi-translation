@@ -9,7 +9,7 @@ from omegaconf import OmegaConf, DictConfig
 from torch.utils.data import Dataset as TorchDataset
 
 from data.quantizer import MidiQuantizer
-from data.tokenizer import MidiEncoder, VelocityEncoder, QuantizedMidiEncoder
+from data.tokenizer import MidiEncoder, VelocityEncoder, QuantizedMidiEncoder, DstartEncoder
 
 
 def build_translation_dataset(
@@ -117,6 +117,8 @@ def load_cache_dataset(
     dataset_name: str,
     split: str,
     force_build: bool = False,
+    predict_column: str = "velocity",
+    tgt_bins: int = 200,
 ) -> MyTokenizedMidiDataset:
     # Prepare caching hash
     config_hash = hashlib.sha256()
@@ -126,8 +128,10 @@ def load_cache_dataset(
 
     # Prepare midi encoders
     src_encoder = QuantizedMidiEncoder(dataset_cfg.quantization)
-    tgt_encoder = VelocityEncoder()
-
+    if predict_column == "velocity":
+        tgt_encoder = VelocityEncoder()
+    elif predict_column == "dstart":
+        tgt_encoder = DstartEncoder(bins=tgt_bins)
     dataset_cache_path = f"tmp/datasets/{config_hash}"
     if not force_build:
         try:
@@ -158,3 +162,21 @@ def load_cache_dataset(
         tgt_encoder=tgt_encoder,
     )
     return tokenized_dataset
+
+
+if __name__ == "__main__":
+    cfg = {
+        "sequence_len": 128,
+        "sequence_step": 42,
+
+        "quantization": {
+            "duration": 3,
+            "dstart": 3,
+            "velocity": 3,
+        },
+    }
+
+    dataset = load_cache_dataset(OmegaConf.create(cfg), dataset_name="roszcz/maestro-v1-sustain", split='validation', predict_column="dstart")
+
+    print(len(dataset[0]["source_token_ids"]))
+    print(len(dataset[0]["source_token_ids"]))

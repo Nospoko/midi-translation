@@ -20,7 +20,11 @@ from utils import vocab_sizes, learning_rate_schedule, calculate_average_distanc
 
 @hydra.main(version_base=None, config_path="configs", config_name="main")
 def main(cfg: DictConfig):
-    train_dataset, val_dataset = load_datasets(dataset_name=cfg.dataset_name, dataset_cfg=cfg.dataset)
+    train_dataset, val_dataset = load_datasets(
+        dataset_name=cfg.dataset_name,
+        dataset_cfg=cfg.dataset,
+        predict=cfg.predict,
+    )
     train_model(train_dataset, val_dataset, cfg)
     print(cfg.run_name)
 
@@ -45,9 +49,20 @@ def save_checkpoint(
 def load_datasets(
     dataset_name: str,
     dataset_cfg: DictConfig,
+    predict: str = "velocity"
 ) -> tuple[MyTokenizedMidiDataset, MyTokenizedMidiDataset]:
-    train_dataset = load_cache_dataset(dataset_name=dataset_name, dataset_cfg=dataset_cfg, split="train")
-    val_dataset = load_cache_dataset(dataset_name=dataset_name, dataset_cfg=dataset_cfg, split="validation")
+    train_dataset = load_cache_dataset(
+        dataset_name=dataset_name,
+        dataset_cfg=dataset_cfg,
+        split="train",
+        predict_column=predict,
+    )
+    val_dataset = load_cache_dataset(
+        dataset_name=dataset_name,
+        dataset_cfg=dataset_cfg,
+        split="validation",
+        predict_column=predict,
+    )
 
     return train_dataset, val_dataset
 
@@ -65,9 +80,10 @@ def train_model(
     val_dataset: MyTokenizedMidiDataset,
     cfg: DictConfig,
 ) -> nn.Module:
+
     # Get the index for padding token
     pad_idx = train_dataset.src_encoder.token_to_id["<blank>"]
-    src_vocab_size, tgt_vocab_size = vocab_sizes(cfg)
+    src_vocab_size, tgt_vocab_size = train_dataset.src_encoder.vocab_size, train_dataset.tgt_encoder.vocab_size
 
     # define model parameters and create the model
     model = make_model(
