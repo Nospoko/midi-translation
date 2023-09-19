@@ -9,7 +9,7 @@ from omegaconf import OmegaConf, DictConfig
 from torch.utils.data import Dataset as TorchDataset
 
 from data.quantizer import MidiQuantizer
-from data.tokenizer import MidiEncoder, VelocityEncoder, QuantizedMidiEncoder, DstartEncoder
+from data.tokenizer import MidiEncoder, DstartEncoder, VelocityEncoder, QuantizedMidiEncoder
 
 
 def build_translation_dataset(
@@ -168,7 +168,6 @@ if __name__ == "__main__":
     cfg = {
         "sequence_len": 128,
         "sequence_step": 42,
-
         "quantization": {
             "duration": 3,
             "dstart": 3,
@@ -176,7 +175,9 @@ if __name__ == "__main__":
         },
     }
 
-    dataset = load_cache_dataset(OmegaConf.create(cfg), dataset_name="roszcz/maestro-v1-sustain", split='validation', predict_column="dstart")
+    dataset = load_cache_dataset(
+        OmegaConf.create(cfg), dataset_name="roszcz/maestro-v1-sustain", split="validation", predict_column="dstart"
+    )
 
     print(len(dataset[0]["source_token_ids"]))
     print(len(dataset[0]["source_token_ids"]))

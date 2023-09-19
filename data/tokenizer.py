@@ -1,11 +1,11 @@
 import itertools
 
-import pandas as pd
-from hydra.utils import to_absolute_path
-from omegaconf import DictConfig
-from uaclient import yaml
 import numpy as np
-from data.quantizer import MidiQuantizer
+import pandas as pd
+from uaclient import yaml
+from omegaconf import DictConfig
+from hydra.utils import to_absolute_path
+
 
 class MidiEncoder:
     def __init__(self):
@@ -130,7 +130,6 @@ class VelocityEncoder(MidiEncoder):
 
 class DstartEncoder(MidiEncoder):
     def __init__(self, bins: int = 200):
-
         self.specials = ["<s>", "</s>", "<blank>"]
         self.bins = bins
         # Make a copy of special tokens ...

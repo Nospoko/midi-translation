@@ -15,7 +15,7 @@ from data.batch import Batch
 from model import make_model
 from modules.label_smoothing import LabelSmoothing
 from data.dataset import MyTokenizedMidiDataset, load_cache_dataset
-from utils import vocab_sizes, learning_rate_schedule, calculate_average_distance
+from utils import learning_rate_schedule, calculate_average_distance
 
 
 @hydra.main(version_base=None, config_path="configs", config_name="main")
@@ -47,9 +47,7 @@ def save_checkpoint(
 
 
 def load_datasets(
-    dataset_name: str,
-    dataset_cfg: DictConfig,
-    predict: str = "velocity"
+    dataset_name: str, dataset_cfg: DictConfig, predict: str = "velocity"
 ) -> tuple[MyTokenizedMidiDataset, MyTokenizedMidiDataset]:
     train_dataset = load_cache_dataset(
         dataset_name=dataset_name,
@@ -80,7 +78,6 @@ def train_model(
     val_dataset: MyTokenizedMidiDataset,
     cfg: DictConfig,
 ) -> nn.Module:
-
     # Get the index for padding token
     pad_idx = train_dataset.src_encoder.token_to_id["<blank>"]
     src_vocab_size, tgt_vocab_size = train_dataset.src_encoder.vocab_size, train_dataset.tgt_encoder.vocab_size
