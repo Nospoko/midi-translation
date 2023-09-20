@@ -53,120 +53,100 @@ def creative_prompts(model: nn.Module, train_cfg: DictConfig, model_dir: str):
     st.audio(gt_paths["mp3_path"])
 
     # Two sines every other note
-    v3_piece = piece[start_note:finish]
-    v3_prompt = two_sines_prompt(v3_piece)
-    v3_piece.df.velocity = v3_prompt
-
-    v3_velocity = generate_velocities(
+    v3_prompt = two_sines_prompt(gt_piece)
+    render_prompt_results(
+        save_base=save_base_pred,
         model=model,
-        piece=v3_piece,
+        prompt=v3_prompt,
+        prompt_title="Two Sines",
+        gt_piece=gt_piece,
         train_cfg=train_cfg,
         quantizer=quantizer,
         src_encoder=src_encoder,
         tgt_encoder=tgt_encoder,
     )
-    v3_piece.df.velocity = v3_velocity
-
-    save_base_v3 = save_base_pred + "-v3"
-    v3_paths = piece_av_files(v3_piece, save_base=save_base_v3)
-
-    v3_fig = velocity_comparison_figure(
-        gt_piece=gt_piece,
-        velocity_prompt=v3_prompt,
-        quantized_prompt=quantizer.quantize_velocity(v3_prompt),
-        generated_velocity=v3_velocity.values,
-    )
-    st.markdown("### Two sines every other note")
-    st.pyplot(v3_fig)
-    st.image(v3_paths["pianoroll_path"])
-    st.audio(v3_paths["mp3_path"])
 
     # Low notes sine
-    v4_piece = piece[start_note:finish]
-    v4_prompt = low_sine_prompt(v4_piece)
-    v4_piece.df.velocity = v4_prompt
-
-    v4_velocity = generate_velocities(
+    v4_prompt = low_sine_prompt(gt_piece)
+    render_prompt_results(
+        save_base=save_base_pred,
         model=model,
-        piece=v4_piece,
+        prompt=v4_prompt,
+        prompt_title="Low Notes Sine",
+        gt_piece=gt_piece,
         train_cfg=train_cfg,
         quantizer=quantizer,
         src_encoder=src_encoder,
         tgt_encoder=tgt_encoder,
     )
-    v4_piece.df.velocity = v4_velocity
-
-    save_base_v4 = save_base_pred + "-v4"
-    v4_paths = piece_av_files(v4_piece, save_base=save_base_v4)
-
-    v4_fig = velocity_comparison_figure(
-        gt_piece=gt_piece,
-        velocity_prompt=v4_prompt,
-        quantized_prompt=quantizer.quantize_velocity(v4_prompt),
-        generated_velocity=v4_velocity.values,
-    )
-    st.markdown("### Sine in low notes only")
-    st.pyplot(v4_fig)
-    st.image(v4_paths["pianoroll_path"])
-    st.audio(v4_paths["mp3_path"])
 
     # constant velocities
-    v5_piece = piece[start_note:finish]
-    v5_prompt = 70 * np.ones_like(v5_piece.df.velocity)
-    v5_piece.df.velocity = v5_prompt
-    v5_velocity = generate_velocities(
+    v5_prompt = 70 * np.ones_like(gt_piece.df.velocity)
+    render_prompt_results(
+        save_base=save_base_pred,
         model=model,
-        piece=v5_piece,
+        prompt=v5_prompt,
+        prompt_title="Constant Initialization",
+        gt_piece=gt_piece,
         train_cfg=train_cfg,
         quantizer=quantizer,
         src_encoder=src_encoder,
         tgt_encoder=tgt_encoder,
     )
-    v5_piece.df.velocity = v5_velocity
-
-    save_base_v5 = save_base_pred + "-v5"
-    v5_paths = piece_av_files(v5_piece, save_base=save_base_v5)
-
-    v5_fig = velocity_comparison_figure(
-        gt_piece=gt_piece,
-        velocity_prompt=v5_prompt,
-        quantized_prompt=quantizer.quantize_velocity(v5_prompt),
-        generated_velocity=v5_velocity.values,
-    )
-
-    st.markdown("### Constant initialization")
-    st.pyplot(v5_fig)
-    st.image(v5_paths["pianoroll_path"])
-    st.audio(v5_paths["mp3_path"])
 
     # Random velocities
-    v1_piece = piece[start_note:finish]
-    v1_prompt = np.random.randint(128, size=v1_piece.size)
-    v1_piece.df.velocity = v1_prompt
-    v1_velocity = generate_velocities(
+    v1_prompt = np.random.randint(128, size=gt_piece.size)
+    render_prompt_results(
+        save_base=save_base_pred,
         model=model,
-        piece=v1_piece,
+        prompt=v1_prompt,
+        prompt_title="Random Initialization",
+        gt_piece=gt_piece,
         train_cfg=train_cfg,
         quantizer=quantizer,
         src_encoder=src_encoder,
         tgt_encoder=tgt_encoder,
     )
-    v1_piece.df.velocity = v1_velocity
 
-    save_base_v1 = save_base_pred + "-v1"
-    v1_paths = piece_av_files(v1_piece, save_base=save_base_v1)
 
-    v1_fig = velocity_comparison_figure(
+def render_prompt_results(
+    save_base: str,
+    model: nn.Module,
+    prompt: np.array,
+    prompt_title: str,
+    gt_piece: MidiPiece,
+    train_cfg: DictConfig,
+    quantizer: MidiQuantizer,
+    src_encoder: MidiEncoder,
+    tgt_encoder: MidiEncoder,
+):
+    # This copies a fortepyan piece
+    piece = gt_piece[:]
+    piece.df.velocity = prompt
+    v1_velocity = generate_velocities(
+        model=model,
+        piece=piece,
+        train_cfg=train_cfg,
+        quantizer=quantizer,
+        src_encoder=src_encoder,
+        tgt_encoder=tgt_encoder,
+    )
+    piece.df.velocity = v1_velocity
+
+    prompt_save_base = save_base + prompt_title.lower().replace(" ", "_")
+    paths = piece_av_files(piece, save_base=prompt_save_base)
+
+    fig = velocity_comparison_figure(
         gt_piece=gt_piece,
-        velocity_prompt=v1_prompt,
-        quantized_prompt=quantizer.quantize_velocity(v1_prompt),
+        velocity_prompt=prompt,
+        quantized_prompt=quantizer.quantize_velocity(prompt),
         generated_velocity=v1_velocity.values,
     )
 
-    st.markdown("### Random initialization")
-    st.pyplot(v1_fig)
-    st.image(v1_paths["pianoroll_path"])
-    st.audio(v1_paths["mp3_path"])
+    st.markdown(f"### {prompt_title}")
+    st.pyplot(fig)
+    st.image(paths["pianoroll_path"])
+    st.audio(paths["mp3_path"])
 
 
 def two_sines_prompt(piece: MidiPiece) -> np.array:
