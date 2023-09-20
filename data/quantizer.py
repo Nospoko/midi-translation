@@ -69,6 +69,11 @@ class MidiQuantizer:
 
         return df
 
+    def quantize_velocity(self, velocity: np.array) -> np.array:
+        velocity_bins = np.digitize(velocity, self.velocity_bin_edges) - 1
+        quantized_velocity = np.array([self.bin_to_velocity[v_bin] for v_bin in velocity_bins])
+        return quantized_velocity
+
     def apply_quantization(self, df: pd.DataFrame) -> pd.DataFrame:
         df["quant_dstart"] = df.dstart_bin.map(lambda it: self.bin_to_dstart[it])
         df["quant_duration"] = df.duration_bin.map(lambda it: self.bin_to_duration[it])

@@ -34,12 +34,16 @@ def creative_prompts(model: nn.Module, train_cfg: DictConfig, model_dir: str):
     # Select one full piece
     record = hf_dataset[record_id]
     piece = MidiPiece.from_huggingface(record)
+    st.markdown(f"Piece size: {piece.size}")
+
+    start_note = st.number_input(label="first note index", value=0)
 
     segments_to_process = 2
     notes_to_process = segments_to_process * train_cfg.dataset.sequence_len
-    gt_piece = piece[:notes_to_process]
+    finish = start_note + notes_to_process
+    gt_piece = piece[start_note:finish]
 
-    save_base_pred = f"{dataset_name}-{split}-{record_id}-{train_cfg.run_name}".replace("/", "_")
+    save_base_pred = f"{dataset_name}-{split}-{record_id}-{start_note}-{train_cfg.run_name}".replace("/", "_")
     save_base_pred = os.path.join(model_dir, save_base_pred)
     gt_paths = piece_av_files(gt_piece, save_base=save_base_pred)
 
@@ -49,7 +53,7 @@ def creative_prompts(model: nn.Module, train_cfg: DictConfig, model_dir: str):
     st.audio(gt_paths["mp3_path"])
 
     # Two sines every other note
-    v3_piece = piece[:notes_to_process]
+    v3_piece = piece[start_note:finish]
     v3_prompt = two_sines_prompt(v3_piece)
     v3_piece.df.velocity = v3_prompt
 
@@ -69,6 +73,7 @@ def creative_prompts(model: nn.Module, train_cfg: DictConfig, model_dir: str):
     v3_fig = velocity_comparison_figure(
         gt_piece=gt_piece,
         velocity_prompt=v3_prompt,
+        quantized_prompt=quantizer.quantize_velocity(v3_prompt),
         generated_velocity=v3_velocity.values,
     )
     st.markdown("### Two sines every other note")
@@ -77,7 +82,7 @@ def creative_prompts(model: nn.Module, train_cfg: DictConfig, model_dir: str):
     st.audio(v3_paths["mp3_path"])
 
     # Low notes sine
-    v4_piece = piece[:notes_to_process]
+    v4_piece = piece[start_note:finish]
     v4_prompt = low_sine_prompt(v4_piece)
     v4_piece.df.velocity = v4_prompt
 
@@ -97,6 +102,7 @@ def creative_prompts(model: nn.Module, train_cfg: DictConfig, model_dir: str):
     v4_fig = velocity_comparison_figure(
         gt_piece=gt_piece,
         velocity_prompt=v4_prompt,
+        quantized_prompt=quantizer.quantize_velocity(v4_prompt),
         generated_velocity=v4_velocity.values,
     )
     st.markdown("### Sine in low notes only")
@@ -104,8 +110,37 @@ def creative_prompts(model: nn.Module, train_cfg: DictConfig, model_dir: str):
     st.image(v4_paths["pianoroll_path"])
     st.audio(v4_paths["mp3_path"])
 
+    # constant velocities
+    v5_piece = piece[start_note:finish]
+    v5_prompt = 70 * np.ones_like(v5_piece.df.velocity)
+    v5_piece.df.velocity = v5_prompt
+    v5_velocity = generate_velocities(
+        model=model,
+        piece=v5_piece,
+        train_cfg=train_cfg,
+        quantizer=quantizer,
+        src_encoder=src_encoder,
+        tgt_encoder=tgt_encoder,
+    )
+    v5_piece.df.velocity = v5_velocity
+
+    save_base_v5 = save_base_pred + "-v5"
+    v5_paths = piece_av_files(v5_piece, save_base=save_base_v5)
+
+    v5_fig = velocity_comparison_figure(
+        gt_piece=gt_piece,
+        velocity_prompt=v5_prompt,
+        quantized_prompt=quantizer.quantize_velocity(v5_prompt),
+        generated_velocity=v5_velocity.values,
+    )
+
+    st.markdown("### Constant initialization")
+    st.pyplot(v5_fig)
+    st.image(v5_paths["pianoroll_path"])
+    st.audio(v5_paths["mp3_path"])
+
     # Random velocities
-    v1_piece = piece[:notes_to_process]
+    v1_piece = piece[start_note:finish]
     v1_prompt = np.random.randint(128, size=v1_piece.size)
     v1_piece.df.velocity = v1_prompt
     v1_velocity = generate_velocities(
@@ -124,6 +159,7 @@ def creative_prompts(model: nn.Module, train_cfg: DictConfig, model_dir: str):
     v1_fig = velocity_comparison_figure(
         gt_piece=gt_piece,
         velocity_prompt=v1_prompt,
+        quantized_prompt=quantizer.quantize_velocity(v1_prompt),
         generated_velocity=v1_velocity.values,
     )
 
@@ -216,10 +252,11 @@ def generate_velocities(
 def velocity_comparison_figure(
     gt_piece: MidiPiece,
     velocity_prompt: np.array,
+    quantized_prompt: np.array,
     generated_velocity: np.array,
 ) -> plt.Figure:
     fig, axes = plt.subplots(
-        nrows=3,
+        nrows=4,
         ncols=1,
         figsize=[8, 3],
         gridspec_kw={
@@ -258,6 +295,21 @@ def velocity_comparison_figure(
     ax.legend(loc="upper right")
 
     ax = axes[2]
+    ax.plot(df.start, quantized_prompt, "o", ms=7, label="quantized")
+    ax.plot(df.start, quantized_prompt, ".", color="white")
+    ax.vlines(
+        df.start,
+        ymin=0,
+        ymax=quantized_prompt,
+        lw=2,
+        alpha=0.777,
+    )
+    ax.set_ylim(0, 160)
+    # Add a grid to the plot
+    ax.grid()
+    ax.legend(loc="upper right")
+
+    ax = axes[3]
     ax.plot(df.start, generated_velocity, "o", ms=7, label="generated")
     ax.plot(df.start, generated_velocity, ".", color="white")
     ax.vlines(
