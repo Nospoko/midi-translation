@@ -15,7 +15,7 @@ from data.batch import Batch
 from model import make_model
 from modules.label_smoothing import LabelSmoothing
 from data.dataset import MyTokenizedMidiDataset, load_cache_dataset
-from utils import learning_rate_schedule, calculate_average_distance, vocab_sizes
+from utils import vocab_sizes, learning_rate_schedule, calculate_average_distance
 
 
 @hydra.main(version_base=None, config_path="configs", config_name="main")

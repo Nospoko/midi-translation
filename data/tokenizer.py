@@ -1,5 +1,4 @@
 import itertools
-import time
 
 import numpy as np
 import pandas as pd
@@ -159,11 +158,9 @@ class DstartEncoder(MidiEncoder):
         # TODO I don't love the idea of adding tokens durint *tokenize* call
         # If we want to pretend that our midi sequences have start and finish
         # we should take care of that before we get here :alarm:
-
-        rec = record.copy()
         dstart = []
-        for it in range(len(rec["start"])-1):
-            dstart.append(rec["start"][it+1] - rec["start"][it])
+        for it in range(len(record["start"]) - 1):
+            dstart.append(record["start"][it + 1] - record["start"][it])
         dstart.append(0)
 
         dstart_bins = np.digitize(dstart, self.bin_edges) - 1
