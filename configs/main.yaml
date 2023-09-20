@@ -8,6 +8,7 @@ train:
 
 dataset_name: 'roszcz/maestro-v1-sustain'
 predict: velocity
+tgt_bins: 200
 
 dataset:
   sequence_len: 128

@@ -15,7 +15,7 @@ from data.batch import Batch
 from model import make_model
 from modules.label_smoothing import LabelSmoothing
 from data.dataset import MyTokenizedMidiDataset, load_cache_dataset
-from utils import learning_rate_schedule, calculate_average_distance
+from utils import learning_rate_schedule, calculate_average_distance, vocab_sizes
 
 
 @hydra.main(version_base=None, config_path="configs", config_name="main")
@@ -80,7 +80,7 @@ def train_model(
 ) -> nn.Module:
     # Get the index for padding token
     pad_idx = train_dataset.src_encoder.token_to_id["<blank>"]
-    src_vocab_size, tgt_vocab_size = train_dataset.src_encoder.vocab_size, train_dataset.tgt_encoder.vocab_size
+    src_vocab_size, tgt_vocab_size = vocab_sizes(cfg)
 
     # define model parameters and create the model
     model = make_model(

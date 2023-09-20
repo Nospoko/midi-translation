@@ -1,4 +1,5 @@
 import itertools
+import time
 
 import numpy as np
 import pandas as pd
@@ -159,16 +160,16 @@ class DstartEncoder(MidiEncoder):
         # If we want to pretend that our midi sequences have start and finish
         # we should take care of that before we get here :alarm:
 
-        df = pd.DataFrame(record)
+        rec = record.copy()
+        dstart = []
+        for it in range(len(rec["start"])-1):
+            dstart.append(rec["start"][it+1] - rec["start"][it])
+        dstart.append(0)
 
-        # Quantize only dstart
-        df["next_start"] = df.start.shift(-1)
-        df["dstart"] = df.next_start - df.start
-        df["dstart_bin"] = np.digitize(df.dstart.fillna(0), self.bin_edges) - 1
+        dstart_bins = np.digitize(dstart, self.bin_edges) - 1
 
         # get tokens from quantized data
-        tokens = [str(dstart_bin) for dstart_bin in df["dstart_bin"]]
-
+        tokens = [str(dstart_bin) for dstart_bin in dstart_bins]
         tokens = ["<s>"] + tokens + ["</s>"]
         return tokens
 
