@@ -64,7 +64,6 @@ def creative_prompts(
         src_encoder=src_encoder,
         tgt_encoder=tgt_encoder,
     )
-
     # Low notes sine
     v4_prompt = low_sine_prompt(gt_piece)
     render_prompt_results(
@@ -94,62 +93,32 @@ def creative_prompts(
     )
 
     # Low notes sine
-    v4_piece = piece[start_note:finish]
-    v4_prompt = low_sine_prompt(v4_piece)
-    v4_piece.df.velocity = v4_prompt
-
-    v4_velocity = generate_velocities(
+    v4_prompt = low_sine_prompt(gt_piece)
+    render_prompt_results(
+        save_base=save_base_pred,
         model=model,
-        piece=v4_piece,
+        prompt=v4_prompt,
+        prompt_title="Low Notes Sine",
+        gt_piece=gt_piece,
         train_cfg=train_cfg,
         quantizer=quantizer,
         src_encoder=src_encoder,
         tgt_encoder=tgt_encoder,
     )
-    v4_piece.df.velocity = v4_velocity
-
-    save_base_v4 = save_base_pred + "-v4"
-    v4_paths = piece_av_files(v4_piece, save_base=save_base_v4)
-
-    v4_fig = velocity_comparison_figure(
-        gt_piece=gt_piece,
-        velocity_prompt=v4_prompt,
-        quantized_prompt=quantizer.quantize_velocity(v4_prompt),
-        generated_velocity=v4_velocity.values,
-    )
-    st.markdown("### Sine in low notes only")
-    st.pyplot(v4_fig)
-    st.image(v4_paths["pianoroll_path"])
-    st.audio(v4_paths["mp3_path"])
 
     # constant velocities
-    v5_piece = piece[start_note:finish]
-    v5_prompt = 70 * np.ones_like(v5_piece.df.velocity)
-    v5_piece.df.velocity = v5_prompt
-    v5_velocity = generate_velocities(
+    v5_prompt = 70 * np.ones_like(gt_piece.df.velocity)
+    render_prompt_results(
+        save_base=save_base_pred,
         model=model,
-        piece=v5_piece,
+        prompt=v5_prompt,
+        prompt_title="Constant Initialization",
+        gt_piece=gt_piece,
         train_cfg=train_cfg,
         quantizer=quantizer,
         src_encoder=src_encoder,
         tgt_encoder=tgt_encoder,
     )
-    v5_piece.df.velocity = v5_velocity
-
-    save_base_v5 = save_base_pred + "-v5"
-    v5_paths = piece_av_files(v5_piece, save_base=save_base_v5)
-
-    v5_fig = velocity_comparison_figure(
-        gt_piece=gt_piece,
-        velocity_prompt=v5_prompt,
-        quantized_prompt=quantizer.quantize_velocity(v5_prompt),
-        generated_velocity=v5_velocity.values,
-    )
-
-    st.markdown("### Constant initialization")
-    st.pyplot(v5_fig)
-    st.image(v5_paths["pianoroll_path"])
-    st.audio(v5_paths["mp3_path"])
 
     # Random velocities
     v1_prompt = np.random.randint(128, size=gt_piece.size)
@@ -204,7 +173,6 @@ def render_prompt_results(
     st.pyplot(fig)
     st.image(paths["pianoroll_path"])
     st.audio(paths["mp3_path"])
-
     midi_path = paths["midi_path"]
     with open(midi_path, "rb") as file:
         download_button_str = download_button(
