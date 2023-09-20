@@ -17,7 +17,7 @@ from utils import vocab_sizes, piece_av_files, decode_and_output, calculate_aver
 
 
 @torch.no_grad()
-def predict_piece_dashboard(model: nn.Module, train_cfg: DictConfig):
+def predict_piece_dashboard(model: nn.Module, train_cfg: DictConfig, model_dir: str):
     # Prepare everythin required to make inference
     quantizer = MidiQuantizer(
         n_dstart_bins=train_cfg.dataset.quantization.dstart,
@@ -35,8 +35,6 @@ def predict_piece_dashboard(model: nn.Module, train_cfg: DictConfig):
     # Select one full piece
     record = hf_dataset[record_id]
     piece = MidiPiece.from_huggingface(record)
-    # Crazy experiment
-    # piece.df.velocity = np.random.randint(128, size=piece.size)
 
     # And run full pre-processing ...
     qpiece = quantizer.inject_quantization_features(piece)
@@ -108,11 +106,6 @@ def predict_piece_dashboard(model: nn.Module, train_cfg: DictConfig):
     st.markdown(f"Average distance: {avg_dist}")
 
     print(f"{avg_loss:6.2f}, {avg_dist:6.2f}")
-
-    # Render audio and video
-    model_dir = f"tmp/dashboard/{train_cfg.run_name}"
-    if not os.path.exists(model_dir):
-        os.mkdir(model_dir)
 
     save_base_pred = f"{dataset_name}-{split}-{record_id}-{train_cfg.run_name}".replace("/", "_")
     save_base_pred = os.path.join(model_dir, save_base_pred)
