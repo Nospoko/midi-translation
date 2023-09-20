@@ -50,14 +50,7 @@ def creative_prompts(model: nn.Module, train_cfg: DictConfig, model_dir: str):
 
     # Two sines every other note
     v3_piece = piece[:notes_to_process]
-    n_left = v3_piece.size // 2
-    x_left = np.linspace(0, 10, n_left)
-    y_left = 70 + 30 * np.sin(x_left)
-
-    n_right = v3_piece.size - n_left
-    x_right = np.linspace(0, 10, n_right)
-    y_right = 70 - 30 * np.sin(x_right)
-    v3_prompt = np.column_stack([y_left, y_right]).ravel().astype(int)
+    v3_prompt = two_sines_prompt(v3_piece)
     v3_piece.df.velocity = v3_prompt
 
     v3_velocity = generate_velocities(
@@ -82,6 +75,34 @@ def creative_prompts(model: nn.Module, train_cfg: DictConfig, model_dir: str):
     st.pyplot(v3_fig)
     st.image(v3_paths["pianoroll_path"])
     st.audio(v3_paths["mp3_path"])
+
+    # Low notes sine
+    v4_piece = piece[:notes_to_process]
+    v4_prompt = low_sine_prompt(v4_piece)
+    v4_piece.df.velocity = v4_prompt
+
+    v4_velocity = generate_velocities(
+        model=model,
+        piece=v4_piece,
+        train_cfg=train_cfg,
+        quantizer=quantizer,
+        src_encoder=src_encoder,
+        tgt_encoder=tgt_encoder,
+    )
+    v4_piece.df.velocity = v4_velocity
+
+    save_base_v4 = save_base_pred + "-v4"
+    v4_paths = piece_av_files(v4_piece, save_base=save_base_v4)
+
+    v4_fig = velocity_comparison_figure(
+        gt_piece=gt_piece,
+        velocity_prompt=v4_prompt,
+        generated_velocity=v4_velocity.values,
+    )
+    st.markdown("### Sine in low notes only")
+    st.pyplot(v4_fig)
+    st.image(v4_paths["pianoroll_path"])
+    st.audio(v4_paths["mp3_path"])
 
     # Random velocities
     v1_piece = piece[:notes_to_process]
@@ -110,6 +131,37 @@ def creative_prompts(model: nn.Module, train_cfg: DictConfig, model_dir: str):
     st.pyplot(v1_fig)
     st.image(v1_paths["pianoroll_path"])
     st.audio(v1_paths["mp3_path"])
+
+
+def two_sines_prompt(piece: MidiPiece) -> np.array:
+    n_left = piece.size // 2
+    x_left = np.linspace(0, 10, n_left)
+    y_left = 70 + 30 * np.sin(x_left)
+
+    n_right = piece.size - n_left
+    x_right = np.linspace(0, 10, n_right)
+    y_right = 70 - 30 * np.sin(x_right)
+    prompt_velocities = np.column_stack([y_left, y_right]).ravel().astype(int)
+
+    return prompt_velocities
+
+
+def low_sine_prompt(piece: MidiPiece) -> np.array:
+    df = piece.df
+
+    # Take the half of the notes on the lower side
+    median_pitch = df.pitch.median()
+    low_ids = df.pitch < median_pitch
+
+    # And make them velocity sine
+    x_low = np.linspace(0, 10, low_ids.sum())
+    y_low = 70 + 30 * np.sin(x_low)
+    low_prompt = y_low.astype(int)
+
+    # Make a copy of the ground truth values
+    prompt_velocities = df.velocity.values
+    prompt_velocities[low_ids] = low_prompt
+    return prompt_velocities
 
 
 def generate_velocities(
