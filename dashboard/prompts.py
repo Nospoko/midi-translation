@@ -255,6 +255,22 @@ def velocity_comparison_figure(
     quantized_prompt: np.array,
     generated_velocity: np.array,
 ) -> plt.Figure:
+    # Helper drawer
+    def draw_velocity(ax: plt.Axes, start: np.array, velocity: np.array, label: str):
+        ax.plot(start, velocity, "o", ms=7, label=label)
+        ax.plot(start, velocity, ".", color="white")
+        ax.vlines(
+            start,
+            ymin=0,
+            ymax=velocity,
+            lw=2,
+            alpha=0.777,
+        )
+        ax.set_ylim(0, 160)
+        # Add a grid to the plot
+        ax.grid()
+        ax.legend(loc="upper right")
+
     fig, axes = plt.subplots(
         nrows=4,
         ncols=1,
@@ -263,65 +279,17 @@ def velocity_comparison_figure(
             "hspace": 0,
         },
     )
-    ax = axes[0]
+
     df = gt_piece.df
-    ax.plot(df.start, df.velocity, "o", ms=7, label="truth")
-    ax.plot(df.start, df.velocity, ".", color="white")
-    ax.vlines(
-        df.start,
-        ymin=0,
-        ymax=df.velocity,
-        lw=2,
-        alpha=0.777,
-    )
-    ax.set_ylim(0, 160)
-    # Add a grid to the plot
-    ax.grid()
-    ax.legend(loc="upper right")
 
-    ax = axes[1]
-    ax.plot(df.start, velocity_prompt, "o", ms=7, label="prompt")
-    ax.plot(df.start, velocity_prompt, ".", color="white")
-    ax.vlines(
-        df.start,
-        ymin=0,
-        ymax=velocity_prompt,
-        lw=2,
-        alpha=0.777,
-    )
-    ax.set_ylim(0, 160)
-    # Add a grid to the plot
-    ax.grid()
-    ax.legend(loc="upper right")
-
-    ax = axes[2]
-    ax.plot(df.start, quantized_prompt, "o", ms=7, label="quantized")
-    ax.plot(df.start, quantized_prompt, ".", color="white")
-    ax.vlines(
-        df.start,
-        ymin=0,
-        ymax=quantized_prompt,
-        lw=2,
-        alpha=0.777,
-    )
-    ax.set_ylim(0, 160)
-    # Add a grid to the plot
-    ax.grid()
-    ax.legend(loc="upper right")
-
-    ax = axes[3]
-    ax.plot(df.start, generated_velocity, "o", ms=7, label="generated")
-    ax.plot(df.start, generated_velocity, ".", color="white")
-    ax.vlines(
-        df.start,
-        ymin=0,
-        ymax=generated_velocity,
-        lw=2,
-        alpha=0.777,
-    )
-    ax.set_ylim(0, 160)
-    # Add a grid to the plot
-    ax.grid()
-    ax.legend(loc="upper right")
+    velocities = [df.velocity, velocity_prompt, quantized_prompt, generated_velocity]
+    labels = ["truth", "prompt", "quantized", "generated"]
+    for it, ax in enumerate(axes):
+        draw_velocity(
+            ax=ax,
+            start=df.start,
+            velocity=velocities[it],
+            label=labels[it],
+        )
 
     return fig
