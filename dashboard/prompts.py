@@ -11,6 +11,7 @@ from omegaconf import DictConfig
 from matplotlib import pyplot as plt
 
 from data.quantizer import MidiQuantizer
+from dashboard.components import download_button
 from utils import piece_av_files, decode_and_output
 from dashboard.components import piece_selector, download_button
 from data.dataset import MyTokenizedMidiDataset, quantized_piece_to_records
@@ -213,6 +214,15 @@ def low_sine_prompt(piece: MidiPiece) -> np.array:
     prompt_velocities[low_ids] = low_prompt
     return prompt_velocities
 
+    midi_path = paths["midi_path"]
+    with open(midi_path, "rb") as file:
+        download_button_str = download_button(
+            object_to_download=file.read(),
+            download_filename=midi_path.split("/")[-1],
+            button_text="Download midi",
+        )
+        st.markdown(download_button_str, unsafe_allow_html=True)
+
 
 def two_sines_prompt(piece: MidiPiece) -> np.array:
     n_left = piece.size // 2
@@ -240,7 +250,7 @@ def low_sine_prompt(piece: MidiPiece) -> np.array:
     low_prompt = y_low.astype(int)
 
     # Make a copy of the ground truth values
-    prompt_velocities = df.velocity.values
+    prompt_velocities = df.velocity.values.copy()
     prompt_velocities[low_ids] = low_prompt
     return prompt_velocities
 
