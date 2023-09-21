@@ -23,7 +23,7 @@ def main(cfg: DictConfig):
     train_dataset, val_dataset = load_datasets(
         dataset_name=cfg.dataset_name,
         dataset_cfg=cfg.dataset,
-        predict=cfg.predict,
+        target=cfg.target,
     )
     train_model(train_dataset, val_dataset, cfg)
     print(cfg.run_name)
@@ -47,19 +47,19 @@ def save_checkpoint(
 
 
 def load_datasets(
-    dataset_name: str, dataset_cfg: DictConfig, predict: str = "velocity"
+    dataset_name: str, dataset_cfg: DictConfig, target: str = "velocity"
 ) -> tuple[MyTokenizedMidiDataset, MyTokenizedMidiDataset]:
     train_dataset = load_cache_dataset(
         dataset_name=dataset_name,
         dataset_cfg=dataset_cfg,
         split="train",
-        predict_column=predict,
+        target=target,
     )
     val_dataset = load_cache_dataset(
         dataset_name=dataset_name,
         dataset_cfg=dataset_cfg,
         split="validation",
-        predict_column=predict,
+        target=target,
     )
 
     return train_dataset, val_dataset

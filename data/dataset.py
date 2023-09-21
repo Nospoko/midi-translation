@@ -117,7 +117,7 @@ def load_cache_dataset(
     dataset_name: str,
     split: str,
     force_build: bool = False,
-    predict_column: str = "velocity",
+    target: str = "velocity",
     tgt_bins: int = 200,
 ) -> MyTokenizedMidiDataset:
     # Prepare caching hash
@@ -128,9 +128,9 @@ def load_cache_dataset(
 
     # Prepare midi encoders
     src_encoder = QuantizedMidiEncoder(dataset_cfg.quantization)
-    if predict_column == "velocity":
+    if target == "velocity":
         tgt_encoder = VelocityEncoder()
-    elif predict_column == "dstart":
+    elif target == "dstart":
         tgt_encoder = DstartEncoder(bins=tgt_bins)
     dataset_cache_path = f"tmp/datasets/{config_hash}"
     if not force_build:
@@ -176,7 +176,7 @@ if __name__ == "__main__":
     }
 
     dataset = load_cache_dataset(
-        OmegaConf.create(cfg), dataset_name="roszcz/maestro-v1-sustain", split="validation", predict_column="dstart"
+        OmegaConf.create(cfg), dataset_name="roszcz/maestro-v1-sustain", split="validation", target="dstart"
     )
 
     print(len(dataset[0]["source_token_ids"]))

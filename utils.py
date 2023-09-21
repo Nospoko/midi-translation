@@ -20,10 +20,10 @@ def vocab_sizes(cfg: DictConfig) -> tuple[int, int]:
     # +3 is for special tokens we don't really use right now
 
     src_vocab_size = 3 + 88 * bins.dstart * bins.velocity * bins.duration
-    if cfg.predict == "velocity":
+    if cfg.target == "velocity":
         tgt_vocab_size = 128 + 3
-    elif cfg.predict == "dstart":
-        tgt_vocab_size = cfg.tgt_bins + 3
+    elif cfg.target == "dstart":
+        tgt_vocab_size = cfg.dstart_bins + 3
     else:
         tgt_vocab_size = None
     return src_vocab_size, tgt_vocab_size
