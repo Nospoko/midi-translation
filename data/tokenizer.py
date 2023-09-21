@@ -1,8 +1,8 @@
 import itertools
 
+import yaml
 import numpy as np
 import pandas as pd
-import yaml
 from omegaconf import DictConfig
 from hydra.utils import to_absolute_path
 
