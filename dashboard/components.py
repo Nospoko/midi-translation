@@ -16,7 +16,6 @@ def piece_selector(dataset_name: str) -> tuple[MidiPiece, str]:
         midi_file = MidiFile(uploaded_file)
         piece = midi_file.piece
         piece.source["path"] = "file uploaded with streamlit"
-        st.write(piece.duration)
 
         # Use file md5 instead of dataset name
         file_hash = hashlib.md5()

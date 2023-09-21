@@ -207,24 +207,5 @@ def model_predictions_review(
             st.audio(predicted_paths["mp3_path"])
 
 
-def prepare_midi_pieces(
-    record: dict,
-    processed_df: pd.DataFrame,
-    idx: int,
-    dataset,
-) -> tuple[MidiPiece, MidiPiece]:
-    # get dataframes with notes
-    quantized_notes = dataset.quantizer.apply_quantization(processed_df)
-
-    # Same for the "src" piece
-    start_time = np.min(processed_df["start"])
-    processed_df["start"] -= start_time
-    processed_df["end"] -= start_time
-
-    quantized_piece = MidiPiece(quantized_notes)
-
-    return quantized_piece
-
-
 if __name__ == "__main__":
     main()
