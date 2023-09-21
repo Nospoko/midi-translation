@@ -49,11 +49,6 @@ def main():
     train_cfg = OmegaConf.create(checkpoint["cfg"])
     train_cfg.device = DEVICE
 
-    # Render audio and video
-    model_dir = f"tmp/dashboard/{train_cfg.run_name}"
-    if not os.path.exists(model_dir):
-        os.mkdir(model_dir)
-
     # - - for model
     st.markdown("Model config:")
     model_params = OmegaConf.to_container(train_cfg.model)

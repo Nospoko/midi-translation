@@ -27,7 +27,6 @@ def predict_piece_dashboard(
     src_encoder = QuantizedMidiEncoder(train_cfg.dataset.quantization)
     tgt_encoder = VelocityEncoder()
 
-
     piece, piece_descriptor = piece_selector(dataset_name=train_cfg.dataset_name)
 
     # And run full pre-processing ...
