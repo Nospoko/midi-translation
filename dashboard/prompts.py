@@ -11,7 +11,6 @@ from omegaconf import DictConfig
 from matplotlib import pyplot as plt
 
 from data.quantizer import MidiQuantizer
-from dashboard.components import download_button
 from utils import piece_av_files, decode_and_output
 from dashboard.components import piece_selector, download_button
 from data.dataset import MyTokenizedMidiDataset, quantized_piece_to_records
