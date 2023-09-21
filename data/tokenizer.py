@@ -154,16 +154,21 @@ class DstartEncoder(MidiEncoder):
     def vocab_size(self) -> int:
         return len(self.vocab)
 
+    def quantize(self, start: list[float]):
+        dstart = []
+        for it in range(len(start) - 1):
+            dstart.append(start[it + 1] - start[it])
+        dstart.append(0)
+
+        dstart_bins = np.digitize(dstart, self.bin_edges) - 1
+
+        return dstart_bins
+
     def tokenize(self, record: dict) -> list[str]:
         # TODO I don't love the idea of adding tokens durint *tokenize* call
         # If we want to pretend that our midi sequences have start and finish
         # we should take care of that before we get here :alarm:
-        dstart = []
-        for it in range(len(record["start"]) - 1):
-            dstart.append(record["start"][it + 1] - record["start"][it])
-        dstart.append(0)
-
-        dstart_bins = np.digitize(dstart, self.bin_edges) - 1
+        dstart_bins = self.quantize(record["start"])
 
         # get tokens from quantized data
         tokens = [str(dstart_bin) for dstart_bin in dstart_bins]
