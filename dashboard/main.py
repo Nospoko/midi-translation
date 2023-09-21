@@ -9,12 +9,13 @@ import torch.nn as nn
 import streamlit as st
 from fortepyan import MidiPiece
 from omegaconf import OmegaConf, DictConfig
-from data.tokenizer import QuantizedMidiEncoder, VelocityEncoder
+
 from model import make_model
 from data.quantizer import MidiQuantizer
 from data.dataset import load_cache_dataset
 from dashboard.prompts import creative_prompts
 from dashboard.predict_piece import predict_piece_dashboard
+from data.tokenizer import VelocityEncoder, QuantizedMidiEncoder
 from utils import vocab_sizes, piece_av_files, generate_sequence
 
 # Set the layout of the Streamlit page

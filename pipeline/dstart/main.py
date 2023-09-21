@@ -1,7 +1,8 @@
 from omegaconf import DictConfig
+
 from training_utils import train_model
 from data.dataset import load_cache_dataset
-from data.tokenizer import QuantizedMidiEncoder, DstartEncoder
+from data.tokenizer import DstartEncoder, QuantizedMidiEncoder
 
 
 def main(cfg: DictConfig):

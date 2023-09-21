@@ -1,7 +1,8 @@
-from omegaconf import OmegaConf, DictConfig
+from omegaconf import DictConfig
+
 from training_utils import train_model
 from data.dataset import load_cache_dataset
-from data.tokenizer import QuantizedMidiEncoder, VelocityEncoder
+from data.tokenizer import VelocityEncoder, QuantizedMidiEncoder
 
 
 def main(cfg: DictConfig):

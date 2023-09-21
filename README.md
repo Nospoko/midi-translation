@@ -6,7 +6,8 @@ quantized MIDI notes.
 
 ## Training
 
-Overview:
+**Overview:**
+Velocity prediction:
 
 ```mermaid
 flowchart TD
@@ -17,31 +18,41 @@ flowchart TD
     F --> G(loss)
     C --> G
 ```
+Dstart prediction:
+```mermaid
+flowchart TD
+    A[MIDI Sequence] --> B(quantized piece)
+    B --> |transformers| E(encoded_decoded)
+    A --> C(high-resolution dstart bins)
+    E --> |generator| F[generated high-resolution dstart bins]
+    F --> G(loss)
+    C --> G
+```
 
-#### Training on gpu
+#### Training options
 
-You can thain the model on gpu simply by running
+You can train the model to predict dstart:
 ```shell
-python train.py device=cuda:0
+python train.py --config-name=dstart_conf
+
+```
+or velocity:
+```shell
+python train.py
 ```
 
 #### Tokenization method
 
-You can train the model to learn to predict high-resolution velocity (128 values) from data quantized into from 2 to 10 bins.
-When specifying number of bins you have to pass it as a string with following format:
+You can train the model to learn to predict high-resolution velocity (128 values)
+from data quantized into up to 10 bins.
 
-```
-bins="[n_dstart_bins] [n_duration_bins] [n_velocity_bins]"
-```
 
-For example, f you want to use 5 bins for dstart, 4 for duration and 7 for velocity, you need to specify bins hyperparameter:
-
+For example, f you want to use 5 bins for dstart, 4 for duration and 1 for velocity, you need to specify bins hyperparameter:
 ```shell
-python train.py bins="5 4 7"
+python train.py dataset.quantization.dstart=5 dataset.quantization.duration=4 dataset.quantization.velocity=1
 ```
 
 #### Other hyperparameters
-
 ```
 train:
   num_epochs: 5
@@ -51,14 +62,21 @@ train:
   distributed: False
   label_smoothing: 0.1
 
+dataset_name: 'roszcz/maestro-v1-sustain'
+
 dataset:
-  dataset_name: "roszcz/maestro-v1"
-  bins: "3 3 3"
-  sequence_size: 128
-device: "cpu"
+  sequence_len: 128
+  sequence_step: 42
+
+  quantization:
+    duration: 3
+    dstart: 3
+    velocity: 3
+
+device: "cuda:0"
 warmup: 3000
 log_frequency: 10
-file_prefix: "to_vel"
+file_prefix: "to-vel"
 run_name: midi-transformer-${now:%Y-%m-%d-%H-%M}
 project: "midi-transformer"
 
@@ -72,7 +90,8 @@ model:
 
 ## Results
 
-The model with parameters from above was trained for ~7.5h on GTX 960M and reached ~2.6 loss on val split of
+The model for velocity prediction, with parameters from above, was trained for ~7.5h on
+GTX 960M and reached ~2.6 loss on val split of
 maestro-v1 dataset as well as on giant-midi-sustain.
 
 ### Dashboard
@@ -100,21 +119,6 @@ Run the same command and choose "Model predictions" option.
 
 You can choose a model to predict velocities of any piece from test dataset.
 ![image](https://github.com/Nospoko/midi-translation/assets/74838859/d8a1f536-26d1-4eb1-9393-2f0353e76cd9)
-
-
-### Eval
-
-You can evaluate your model and see the loss on the test dataset. For example if you have a model weights file called
-
-```
-10-10-3-to_vel_model-midi-transformer-2023-08-31-14-38-final.pt
-```
-
-You can run:
-
-```shell
-python evaluate.py run_name="2023-08-31-14-38" dataset.dataset_name="roszcz/maestro-v1-sustain"
-```
 
 
 ### Code Style

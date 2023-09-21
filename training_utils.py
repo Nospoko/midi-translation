@@ -12,8 +12,8 @@ from torch.optim.lr_scheduler import LambdaLR
 import wandb
 from data.batch import Batch
 from model import make_model
-from modules.label_smoothing import LabelSmoothing
 from data.dataset import MyTokenizedMidiDataset
+from modules.label_smoothing import LabelSmoothing
 from utils import vocab_sizes, learning_rate_schedule, calculate_average_distance
 
 
