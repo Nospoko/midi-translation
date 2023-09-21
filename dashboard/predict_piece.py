@@ -4,37 +4,30 @@ import torch
 import torch.nn as nn
 import streamlit as st
 from tqdm import tqdm
+from datasets import Dataset
 from fortepyan import MidiPiece
 from omegaconf import DictConfig
-from datasets import Dataset, load_dataset
 
 from data.quantizer import MidiQuantizer
-from dashboard.components import download_button
 from modules.label_smoothing import LabelSmoothing
+from dashboard.components import piece_selector, download_button
 from data.tokenizer import VelocityEncoder, QuantizedMidiEncoder
 from data.dataset import MyTokenizedMidiDataset, quantized_piece_to_records
 from utils import vocab_sizes, piece_av_files, decode_and_output, calculate_average_distance
 
 
 @torch.no_grad()
-def predict_piece_dashboard(model: nn.Module, train_cfg: DictConfig, model_dir: str):
+def predict_piece_dashboard(
+    model: nn.Module,
+    quantizer: MidiQuantizer,
+    train_cfg: DictConfig,
+    model_dir: str,
+):
     # Prepare everythin required to make inference
-    quantizer = MidiQuantizer(
-        n_dstart_bins=train_cfg.dataset.quantization.dstart,
-        n_duration_bins=train_cfg.dataset.quantization.duration,
-        n_velocity_bins=train_cfg.dataset.quantization.velocity,
-    )
     src_encoder = QuantizedMidiEncoder(train_cfg.dataset.quantization)
     tgt_encoder = VelocityEncoder()
 
-    dataset_name = st.text_input(label="dataset", value=train_cfg.dataset_name)
-    split = st.text_input(label="split", value="test")
-    record_id = st.number_input(label="record id", value=0)
-    hf_dataset = load_dataset(dataset_name, split=split)
-
-    # Select one full piece
-    record = hf_dataset[record_id]
-    piece = MidiPiece.from_huggingface(record)
+    piece, piece_descriptor = piece_selector(dataset_name=train_cfg.dataset_name)
 
     # And run full pre-processing ...
     qpiece = quantizer.inject_quantization_features(piece)
@@ -107,7 +100,7 @@ def predict_piece_dashboard(model: nn.Module, train_cfg: DictConfig, model_dir: 
 
     print(f"{avg_loss:6.2f}, {avg_dist:6.2f}")
 
-    save_base_pred = f"{dataset_name}-{split}-{record_id}-{train_cfg.run_name}".replace("/", "_")
+    save_base_pred = f"{piece_descriptor}-{train_cfg.run_name}".replace("/", "_")
     save_base_pred = os.path.join(model_dir, save_base_pred)
     pred_paths = piece_av_files(predicted_piece, save_base=save_base_pred)
 

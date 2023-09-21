@@ -27,7 +27,9 @@ def piece_selector(dataset_name: str) -> tuple[MidiPiece, str]:
         st.write("Or use a dataset")
         dataset_name = st.text_input(label="dataset", value=dataset_name)
         split = st.text_input(label="split", value="test")
-        record_id = st.number_input(label="record id", value=0)
+
+        # Test/77 is Chopin "Etude Op. 10 No. 12"
+        record_id = st.number_input(label="record id", value=77)
         hf_dataset = load_dataset(dataset_name, split=split)
 
         # Select one full piece

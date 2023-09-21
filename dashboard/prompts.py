@@ -17,16 +17,16 @@ from data.dataset import MyTokenizedMidiDataset, quantized_piece_to_records
 from data.tokenizer import MidiEncoder, VelocityEncoder, QuantizedMidiEncoder
 
 
-def creative_prompts(model: nn.Module, train_cfg: DictConfig, model_dir: str):
-    quantizer = MidiQuantizer(
-        n_dstart_bins=train_cfg.dataset.quantization.dstart,
-        n_duration_bins=train_cfg.dataset.quantization.duration,
-        n_velocity_bins=train_cfg.dataset.quantization.velocity,
-    )
-    st.markdown(f"Velocity bins: {quantizer.velocity_bin_edges}")
+def creative_prompts(
+    model: nn.Module,
+    quantizer: MidiQuantizer,
+    train_cfg: DictConfig,
+    model_dir: str,
+):
     src_encoder = QuantizedMidiEncoder(train_cfg.dataset.quantization)
     tgt_encoder = VelocityEncoder()
 
+    # Custom streamlit element to select a piece for processing
     piece, piece_descriptor = piece_selector(train_cfg.dataset_name)
 
     st.markdown(f"Piece size: {piece.size}")
