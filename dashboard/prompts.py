@@ -5,14 +5,14 @@ import pandas as pd
 import torch.nn as nn
 import streamlit as st
 from tqdm import tqdm
+from datasets import Dataset
 from fortepyan import MidiPiece
 from omegaconf import DictConfig
 from matplotlib import pyplot as plt
-from datasets import Dataset, load_dataset
 
 from data.quantizer import MidiQuantizer
-from dashboard.components import download_button
 from utils import piece_av_files, decode_and_output
+from dashboard.components import piece_selector, download_button
 from data.dataset import MyTokenizedMidiDataset, quantized_piece_to_records
 from data.tokenizer import MidiEncoder, VelocityEncoder, QuantizedMidiEncoder
 
@@ -27,24 +27,22 @@ def creative_prompts(model: nn.Module, train_cfg: DictConfig, model_dir: str):
     src_encoder = QuantizedMidiEncoder(train_cfg.dataset.quantization)
     tgt_encoder = VelocityEncoder()
 
-    dataset_name = st.text_input(label="dataset", value=train_cfg.dataset_name)
-    split = st.text_input(label="split", value="test")
-    record_id = st.number_input(label="record id", value=0)
-    hf_dataset = load_dataset(dataset_name, split=split)
+    piece, piece_descriptor = piece_selector(train_cfg.dataset_name)
 
-    # Select one full piece
-    record = hf_dataset[record_id]
-    piece = MidiPiece.from_huggingface(record)
     st.markdown(f"Piece size: {piece.size}")
 
-    start_note = st.number_input(label="first note index", value=0)
+    cols = st.columns(2)
+    with cols[0]:
+        start_note = st.number_input(label="first note index", value=0)
+    with cols[1]:
+        label = f"segments to process [segment_len={train_cfg.dataset.sequence_len}]"
+        segments_to_process = st.number_input(label=label, value=2)
 
-    segments_to_process = 2
     notes_to_process = segments_to_process * train_cfg.dataset.sequence_len
     finish = start_note + notes_to_process
     gt_piece = piece[start_note:finish]
 
-    save_base_pred = f"{dataset_name}-{split}-{record_id}-{start_note}-{train_cfg.run_name}".replace("/", "_")
+    save_base_pred = f"{piece_descriptor}-{start_note}-{finish}-{train_cfg.run_name}".replace("/", "_")
     save_base_pred = os.path.join(model_dir, save_base_pred)
     gt_paths = piece_av_files(gt_piece, save_base=save_base_pred)
 
