@@ -9,7 +9,7 @@ import torch.nn as nn
 import streamlit as st
 from fortepyan import MidiPiece
 from omegaconf import OmegaConf, DictConfig
-
+from data.tokenizer import QuantizedMidiEncoder, VelocityEncoder
 from model import make_model
 from data.quantizer import MidiQuantizer
 from data.dataset import load_cache_dataset
@@ -109,11 +109,14 @@ def model_predictions_review(
     split = st.text_input(label="split", value="test")
 
     random_seed = st.selectbox(label="random seed", options=range(20))
-
+    src_encoder = QuantizedMidiEncoder(quantization_cfg=train_cfg.dataset.quantization)
+    tgt_encoder = VelocityEncoder()
     dataset = load_cache_dataset(
         dataset_name=dataset_name,
         dataset_cfg=dataset_cfg,
         split=split,
+        src_encoder=src_encoder,
+        tgt_encoder=tgt_encoder,
     )
 
     n_samples = 5

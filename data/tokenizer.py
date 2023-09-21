@@ -31,6 +31,7 @@ class MidiEncoder:
 
 class QuantizedMidiEncoder(MidiEncoder):
     def __init__(self, quantization_cfg: DictConfig):
+        super().__init__()
         self.quantization_cfg = quantization_cfg
         self.keys = ["pitch", "dstart_bin", "duration_bin", "velocity_bin"]
         self.specials = ["<s>", "</s>", "<blank>"]
@@ -92,6 +93,7 @@ class QuantizedMidiEncoder(MidiEncoder):
 
 class VelocityEncoder(MidiEncoder):
     def __init__(self):
+        super().__init__()
         self.key = "velocity"
         self.specials = ["<s>", "</s>", "<blank>"]
 
@@ -130,16 +132,17 @@ class VelocityEncoder(MidiEncoder):
 
 class DstartEncoder(MidiEncoder):
     def __init__(self, bins: int = 200):
+        super().__init__()
         self.specials = ["<s>", "</s>", "<blank>"]
         self.bins = bins
         # Make a copy of special tokens ...
         self.vocab = list(self.specials)
-        self.bin_edges = self.load_bin_edges()
         # ... and add velocity tokens
         self._build_vocab()
+        self._bin_edges = self._load_bin_edges()
         self.token_to_id = {token: it for it, token in enumerate(self.vocab)}
 
-    def load_bin_edges(self):
+    def _load_bin_edges(self):
         artifacts_path = to_absolute_path("artifacts/bin_edges.yaml")
         with open(artifacts_path, "r") as f:
             bin_edges = yaml.safe_load(f)
@@ -160,7 +163,7 @@ class DstartEncoder(MidiEncoder):
             dstart.append(start[it + 1] - start[it])
         dstart.append(0)
 
-        dstart_bins = np.digitize(dstart, self.bin_edges) - 1
+        dstart_bins = np.digitize(dstart, self._bin_edges) - 1
 
         return dstart_bins
 
