@@ -64,33 +64,6 @@ def creative_prompts(
         src_encoder=src_encoder,
         tgt_encoder=tgt_encoder,
     )
-    # Low notes sine
-    v4_prompt = low_sine_prompt(gt_piece)
-    render_prompt_results(
-        save_base=save_base_pred,
-        model=model,
-        prompt=v4_prompt,
-        prompt_title="Low Notes Sine",
-        gt_piece=gt_piece,
-        train_cfg=train_cfg,
-        quantizer=quantizer,
-        src_encoder=src_encoder,
-        tgt_encoder=tgt_encoder,
-    )
-
-    # constant velocities
-    v5_prompt = 70 * np.ones_like(gt_piece.df.velocity)
-    render_prompt_results(
-        save_base=save_base_pred,
-        model=model,
-        prompt=v5_prompt,
-        prompt_title="Constant Initialization",
-        gt_piece=gt_piece,
-        train_cfg=train_cfg,
-        quantizer=quantizer,
-        src_encoder=src_encoder,
-        tgt_encoder=tgt_encoder,
-    )
 
     # Low notes sine
     v4_prompt = low_sine_prompt(gt_piece)
