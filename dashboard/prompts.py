@@ -146,45 +146,6 @@ def render_prompt_results(
     st.pyplot(fig)
     st.image(paths["pianoroll_path"])
     st.audio(paths["mp3_path"])
-    midi_path = paths["midi_path"]
-    with open(midi_path, "rb") as file:
-        download_button_str = download_button(
-            object_to_download=file.read(),
-            download_filename=midi_path.split("/")[-1],
-            button_text="Download midi",
-        )
-        st.markdown(download_button_str, unsafe_allow_html=True)
-
-
-def two_sines_prompt(piece: MidiPiece) -> np.array:
-    n_left = piece.size // 2
-    x_left = np.linspace(0, 10, n_left)
-    y_left = 70 + 30 * np.sin(x_left)
-
-    n_right = piece.size - n_left
-    x_right = np.linspace(0, 10, n_right)
-    y_right = 70 - 30 * np.sin(x_right)
-    prompt_velocities = np.column_stack([y_left, y_right]).ravel().astype(int)
-
-    return prompt_velocities
-
-
-def low_sine_prompt(piece: MidiPiece) -> np.array:
-    df = piece.df
-
-    # Take the half of the notes on the lower side
-    median_pitch = df.pitch.median()
-    low_ids = df.pitch < median_pitch
-
-    # And make them velocity sine
-    x_low = np.linspace(0, 10, low_ids.sum())
-    y_low = 70 + 30 * np.sin(x_low)
-    low_prompt = y_low.astype(int)
-
-    # Make a copy of the ground truth values
-    prompt_velocities = df.velocity.values.copy()
-    prompt_velocities[low_ids] = low_prompt
-    return prompt_velocities
 
     midi_path = paths["midi_path"]
     with open(midi_path, "rb") as file:
