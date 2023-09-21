@@ -2,8 +2,41 @@ import re
 import json
 import uuid
 import base64
+import hashlib
 
 import pandas as pd
+import streamlit as st
+from datasets import load_dataset
+from fortepyan import MidiFile, MidiPiece
+
+
+def piece_selector(dataset_name: str) -> tuple[MidiPiece, str]:
+    uploaded_file = st.file_uploader("Choose a file")
+    if uploaded_file is not None:
+        midi_file = MidiFile(uploaded_file)
+        piece = midi_file.piece
+        piece.source["path"] = "file uploaded with streamlit"
+
+        # Use file md5 instead of dataset name
+        file_hash = hashlib.md5()
+        uploaded_file.seek(0)
+        file_hash.update(uploaded_file.read())
+        piece_descriptor = file_hash.hexdigest()
+    else:
+        st.write("Or use a dataset")
+        dataset_name = st.text_input(label="dataset", value=dataset_name)
+        split = st.text_input(label="split", value="test")
+
+        # Test/77 is Chopin "Etude Op. 10 No. 12"
+        record_id = st.number_input(label="record id", value=77)
+        hf_dataset = load_dataset(dataset_name, split=split)
+
+        # Select one full piece
+        record = hf_dataset[record_id]
+        piece = MidiPiece.from_huggingface(record)
+        piece_descriptor = f"{dataset_name}-{split}-{record_id}"
+
+    return piece, piece_descriptor
 
 
 def download_button(object_to_download, download_filename, button_text):

@@ -13,19 +13,26 @@ from omegaconf import OmegaConf, DictConfig
 from model import make_model
 from data.quantizer import MidiQuantizer
 from data.dataset import load_cache_dataset
+from dashboard.prompts import creative_prompts
 from dashboard.predict_piece import predict_piece_dashboard
 from utils import vocab_sizes, piece_av_files, generate_sequence
 
-# For now let's run all dashboards on CPU
-DEVICE = "cuda:0"
+# Set the layout of the Streamlit page
+st.set_page_config(layout="wide", page_title="Velocity Transformer", page_icon=":musical_keyboard")
+
+with st.sidebar:
+    devices = ["cpu"] + [f"cuda:{it}" for it in range(torch.cuda.device_count())]
+    DEVICE = st.selectbox(label="Processing device", options=devices)
 
 
 def main():
-    # Set the layout of the Streamlit page
-    st.set_page_config(layout="wide", page_title="Velocity Transformer", page_icon=":musical_keyboard")
-
     with st.sidebar:
-        mode = st.selectbox(label="Display", options=["Sequence predictions", "Piece predictions"])
+        dashboards = [
+            "Creative Prompts",
+            "Piece predictions",
+            "Sequence predictions",
+        ]
+        mode = st.selectbox(label="Display", options=dashboards)
 
     with st.sidebar:
         # Show available checkpoints
@@ -66,27 +73,40 @@ def main():
     model.load_state_dict(checkpoint["model_state_dict"])
     model.eval().to(DEVICE)
 
+    # - quantizer
+    quantizer = MidiQuantizer(
+        n_dstart_bins=train_cfg.dataset.quantization.dstart,
+        n_duration_bins=train_cfg.dataset.quantization.duration,
+        n_velocity_bins=train_cfg.dataset.quantization.velocity,
+    )
+    st.markdown(f"Velocity bins: {quantizer.velocity_bin_edges}")
+
     n_parameters = sum(p.numel() for p in model.parameters()) / 1e6
     st.markdown(f"Model parameters: {n_parameters:.3f}M")
 
+    # Folder to render audio and video
+    model_dir = f"tmp/dashboard/{train_cfg.run_name}"
+
+    if not os.path.exists(model_dir):
+        os.mkdir(model_dir)
     if mode == "Piece predictions":
-        predict_piece_dashboard(model, train_cfg)
+        predict_piece_dashboard(model, quantizer, train_cfg, model_dir)
     if mode == "Sequence predictions":
-        model_predictions_review(model, train_cfg)
+        model_predictions_review(model, quantizer, train_cfg, model_dir)
+    if mode == "Creative Prompts":
+        creative_prompts(model, quantizer, train_cfg, model_dir)
 
 
-def model_predictions_review(model: nn.Module, train_cfg: DictConfig):
+def model_predictions_review(
+    model: nn.Module,
+    quantizer: MidiQuantizer,
+    train_cfg: DictConfig,
+    model_dir: str,
+):
     # load checkpoint, force dashboard device
     dataset_cfg = train_cfg.dataset
     dataset_name = st.text_input(label="dataset", value=train_cfg.dataset_name)
     split = st.text_input(label="split", value="test")
-
-    # Prepare everything required to make inference
-    quantizer = MidiQuantizer(
-        n_dstart_bins=dataset_cfg.quantization.dstart,
-        n_duration_bins=dataset_cfg.quantization.duration,
-        n_velocity_bins=dataset_cfg.quantization.velocity,
-    )
 
     random_seed = st.selectbox(label="random seed", options=range(20))
 
@@ -158,10 +178,6 @@ def model_predictions_review(model: nn.Module, train_cfg: DictConfig):
         pred_piece.source = true_piece.source.copy()
         quantized_vel_piece.source = true_piece.source.copy()
 
-        model_dir = f"tmp/dashboard/{train_cfg.run_name}"
-        if not os.path.exists(model_dir):
-            os.mkdir(model_dir)
-
         # create files
         true_save_base = os.path.join(model_dir, f"true_{record_id}")
         true_piece_paths = piece_av_files(piece=true_piece, save_base=true_save_base)
@@ -189,25 +205,6 @@ def model_predictions_review(model: nn.Module, train_cfg: DictConfig):
             # Predicted
             st.image(predicted_paths["pianoroll_path"])
             st.audio(predicted_paths["mp3_path"])
-
-
-def prepare_midi_pieces(
-    record: dict,
-    processed_df: pd.DataFrame,
-    idx: int,
-    dataset,
-) -> tuple[MidiPiece, MidiPiece]:
-    # get dataframes with notes
-    quantized_notes = dataset.quantizer.apply_quantization(processed_df)
-
-    # Same for the "src" piece
-    start_time = np.min(processed_df["start"])
-    processed_df["start"] -= start_time
-    processed_df["end"] -= start_time
-
-    quantized_piece = MidiPiece(quantized_notes)
-
-    return quantized_piece
 
 
 if __name__ == "__main__":

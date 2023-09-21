@@ -47,7 +47,7 @@ def build_translation_dataset(
 
 def quantized_piece_to_records(piece: ff.MidiPiece, sequence_len: int, sequence_step: int):
     chopped_sequences = []
-    n_samples = (piece.size - sequence_len) // sequence_step
+    n_samples = 1 + (piece.size - sequence_len) // sequence_step
     for jt in range(n_samples):
         start = jt * sequence_step
         finish = start + sequence_len
