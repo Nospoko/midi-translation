@@ -1,14 +1,8 @@
-run_name: ""
-model_epoch: "final"
+run_name: "midi-transformer-2023-09-21-08-29"
 
 n_examples: 5
 random_examples: False
 device: "cpu"
-dataset_split: "test"
-dataset:
-  dataset_name: null
-  bins: null
-  sequence_size: null
-tasks:
-  val_epoch: True
-  translation: False
+dataset_name: "roszcz/maestro-v1-sustain"
+split: "test"
+
