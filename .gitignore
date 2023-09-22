@@ -5,7 +5,7 @@ tmp/*
 *.pt
 outputs/*
 wandb/*
-models/*
+checkpoints/*
 documentation/files
 midi_files/*
 upload_models.py

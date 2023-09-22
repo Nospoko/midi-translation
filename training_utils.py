@@ -121,7 +121,7 @@ def save_checkpoint(
     optimizer: torch.optim.Optimizer,
     cfg: DictConfig,
 ):
-    path = f"models/{cfg.run_name}.pt"
+    path = f"checkpoints/{cfg.target}/{cfg.run_name}.pt"
     torch.save(
         {
             "model_state_dict": model.state_dict(),

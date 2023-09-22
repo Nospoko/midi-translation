@@ -96,11 +96,15 @@ maestro-v1 dataset as well as on giant-midi-sustain.
 
 ### Dashboard
 
-To start the dashboard you need to run streamlit.
+To start the velocity prediction dashboard you need to run streamlit.
 
 ```shell
 # Streamlit has issues with accepting it's run in the root directory
-PYTHONPATH=. streamlit run --server.port 4466 dashboard/main.py
+PYTHONPATH=. streamlit run --server.port 4466 dashboard/velocity/main.py
+```
+For dstart prediction run:
+```shell
+PYTHONPATH=. streamlit run --server.port 4466 dashboard/dstart/main.py
 ```
 
 #### Tokenization review dashboard
