@@ -12,7 +12,7 @@ from omegaconf import OmegaConf, DictConfig
 
 from model import make_model
 from data.quantizer import MidiQuantizer
-from data.dataset import load_cache_dataset
+from data.dataset import load_cache_dataset, MyTokenizedMidiDataset
 from dashboard.prompts import creative_prompts
 from dashboard.predict_piece import predict_piece_dashboard
 from data.tokenizer import VelocityEncoder, QuantizedMidiEncoder
@@ -110,12 +110,18 @@ def model_predictions_review(
     split = st.text_input(label="split", value="test")
 
     random_seed = st.selectbox(label="random seed", options=range(20))
+
+    # load translation dataset and create MyTokenizedMidiDataset
     src_encoder = QuantizedMidiEncoder(quantization_cfg=train_cfg.dataset.quantization)
     tgt_encoder = VelocityEncoder()
-    dataset = load_cache_dataset(
+    translation_dataset = load_cache_dataset(
         dataset_name=dataset_name,
         dataset_cfg=dataset_cfg,
         split=split,
+    )
+    dataset = MyTokenizedMidiDataset(
+        dataset=translation_dataset,
+        dataset_cfg=dataset_cfg,
         src_encoder=src_encoder,
         tgt_encoder=tgt_encoder,
     )

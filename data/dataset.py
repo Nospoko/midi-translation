@@ -116,10 +116,8 @@ def load_cache_dataset(
     dataset_cfg: DictConfig,
     dataset_name: str,
     split: str,
-    src_encoder: MidiEncoder,
-    tgt_encoder: MidiEncoder,
     force_build: bool = False,
-) -> MyTokenizedMidiDataset:
+) -> Dataset:
     # Prepare caching hash
     config_hash = hashlib.sha256()
     config_string = json.dumps(OmegaConf.to_container(dataset_cfg)) + split + dataset_name
@@ -131,14 +129,7 @@ def load_cache_dataset(
     if not force_build:
         try:
             translation_dataset = Dataset.load_from_disk(dataset_cache_path)
-
-            tokenized_dataset = MyTokenizedMidiDataset(
-                dataset=translation_dataset,
-                dataset_cfg=dataset_cfg,
-                src_encoder=src_encoder,
-                tgt_encoder=tgt_encoder,
-            )
-            return tokenized_dataset
+            return translation_dataset
         except Exception as e:
             print("Failed loading cached dataset:", e)
 
@@ -150,10 +141,4 @@ def load_cache_dataset(
     )
     translation_dataset.save_to_disk(dataset_cache_path)
 
-    tokenized_dataset = MyTokenizedMidiDataset(
-        dataset=translation_dataset,
-        dataset_cfg=dataset_cfg,
-        src_encoder=src_encoder,
-        tgt_encoder=tgt_encoder,
-    )
-    return tokenized_dataset
+    return translation_dataset
