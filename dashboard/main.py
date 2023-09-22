@@ -12,11 +12,11 @@ from omegaconf import OmegaConf, DictConfig
 
 from model import make_model
 from data.quantizer import MidiQuantizer
-from data.dataset import load_cache_dataset, MyTokenizedMidiDataset
 from dashboard.prompts import creative_prompts
 from dashboard.predict_piece import predict_piece_dashboard
 from data.tokenizer import VelocityEncoder, QuantizedMidiEncoder
 from utils import vocab_sizes, piece_av_files, generate_sequence
+from data.dataset import MyTokenizedMidiDataset, load_cache_dataset
 
 # Set the layout of the Streamlit page
 st.set_page_config(layout="wide", page_title="Velocity Transformer", page_icon=":musical_keyboard")

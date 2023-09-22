@@ -1,8 +1,8 @@
 from omegaconf import DictConfig
-from data.dataset import MyTokenizedMidiDataset
+
 from training_utils import train_model
-from data.dataset import load_cache_dataset
 from data.tokenizer import VelocityEncoder, QuantizedMidiEncoder
+from data.dataset import MyTokenizedMidiDataset, load_cache_dataset
 
 
 def load_datasets(cfg: DictConfig) -> tuple[MyTokenizedMidiDataset, MyTokenizedMidiDataset]:
@@ -24,13 +24,13 @@ def load_datasets(cfg: DictConfig) -> tuple[MyTokenizedMidiDataset, MyTokenizedM
         dataset=train_translation_dataset,
         dataset_cfg=cfg.dataset,
         src_encoder=src_encoder,
-        tgt_encoder=tgt_encoder
+        tgt_encoder=tgt_encoder,
     )
     val_dataset = MyTokenizedMidiDataset(
         dataset=val_translation_dataset,
         dataset_cfg=cfg.dataset,
         src_encoder=src_encoder,
-        tgt_encoder=tgt_encoder
+        tgt_encoder=tgt_encoder,
     )
     return train_dataset, val_dataset
 
