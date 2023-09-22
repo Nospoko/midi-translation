@@ -140,6 +140,8 @@ class DstartEncoder(MidiEncoder):
         # ... and add velocity tokens
         self._build_vocab()
         self._bin_edges = self._load_bin_edges()
+        self.bin_to_dstart = []
+        self._build_dstart_decoder()
         self.token_to_id = {token: it for it, token in enumerate(self.vocab)}
 
     def _load_bin_edges(self):
@@ -153,11 +155,26 @@ class DstartEncoder(MidiEncoder):
     def _build_vocab(self):
         self.vocab += [str(possible_bin) for possible_bin in range(self.bins)]
 
+    def _build_dstart_decoder(self):
+        self.bin_to_dstart = []
+        for it in range(1, len(self._bin_edges)):
+            dstart = (self._bin_edges[it - 1] + self._bin_edges[it]) / 2
+            self.bin_to_dstart.append(dstart)
+
+        last_dstart = 2 * self._bin_edges[-1]
+        self.bin_to_dstart.append(last_dstart)
+
     @property
     def vocab_size(self) -> int:
         return len(self.vocab)
 
-    def quantize(self, start: list[float]):
+    def unquantized_start(self, dstart_bins: pd.Series) -> pd.Series:
+        quant_dstart = [self.bin_to_dstart[it] for it in dstart_bins]
+        start = pd.Series(quant_dstart).cumsum().shift(1).fillna(0)
+
+        return start
+
+    def quantize(self, start: list[float]) -> list[int]:
         dstart = []
         for it in range(len(start) - 1):
             dstart.append(start[it + 1] - start[it])
