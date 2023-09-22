@@ -1,14 +1,14 @@
 import glob
 
-import torch
-from omegaconf import DictConfig, OmegaConf
 import hydra
+import torch
+from omegaconf import OmegaConf, DictConfig
+
 from model import make_model
 from utils import vocab_sizes
-from training_utils import val_epoch
-from pipeline.velocity import evaluate as velocity_evaluation
-from pipeline.dstart import evaluate as dstart_evaluation
 from data.dataset import load_cache_dataset
+from pipeline.dstart import evaluate as dstart_evaluation
+from pipeline.velocity import evaluate as velocity_evaluation
 
 
 def load_model_checkpoint(cfg: DictConfig) -> dict:
@@ -58,4 +58,3 @@ def main(cfg: DictConfig):
 
 if __name__ == "__main__":
     main()
-

@@ -9,15 +9,16 @@ import torch.nn as nn
 import streamlit as st
 from fortepyan import MidiPiece
 from omegaconf import OmegaConf, DictConfig
+from predict_piece import predict_piece_dashboard
 
 from model import make_model
 from data.quantizer import MidiQuantizer
+from data.tokenizer import DstartEncoder, QuantizedMidiEncoder
 from utils import vocab_sizes, piece_av_files, generate_sequence
 from data.dataset import MyTokenizedMidiDataset, load_cache_dataset
-from data.tokenizer import DstartEncoder, QuantizedMidiEncoder
 
 # Set the layout of the Streamlit page
-st.set_page_config(layout="wide", page_title="Velocity Transformer", page_icon=":musical_keyboard")
+st.set_page_config(layout="wide", page_title="Dstart Transformer", page_icon=":musical_keyboard")
 
 with st.sidebar:
     devices = ["cpu"] + [f"cuda:{it}" for it in range(torch.cuda.device_count())]
@@ -28,6 +29,7 @@ def main():
     with st.sidebar:
         dashboards = [
             "Sequence predictions",
+            "Piece predictions",
         ]
         mode = st.selectbox(label="Display", options=dashboards)
 
@@ -76,7 +78,7 @@ def main():
         n_duration_bins=train_cfg.dataset.quantization.duration,
         n_velocity_bins=train_cfg.dataset.quantization.velocity,
     )
-    st.markdown(f"Velocity bins: {quantizer.velocity_bin_edges}")
+    st.markdown(f"Dstart bins: {quantizer.dstart_bin_edges}")
 
     n_parameters = sum(p.numel() for p in model.parameters()) / 1e6
     st.markdown(f"Model parameters: {n_parameters:.3f}M")
@@ -89,7 +91,8 @@ def main():
 
     if mode == "Sequence predictions":
         model_predictions_review(model, quantizer, train_cfg, model_dir)
-
+    if mode == "Piece predictions":
+        predict_piece_dashboard(model, quantizer, train_cfg, model_dir)
 
 
 def model_predictions_review(

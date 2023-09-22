@@ -1,12 +1,12 @@
-from data.dataset import MyTokenizedMidiDataset
-from data.tokenizer import QuantizedMidiEncoder, DstartEncoder
-from omegaconf import DictConfig
 import torch.nn as nn
-from datasets import Dataset
-from utils import decode_and_output, calculate_average_distance
-from modules.label_smoothing import LabelSmoothing
-from utils import vocab_sizes
 from tqdm import tqdm
+from datasets import Dataset
+from omegaconf import DictConfig
+
+from data.dataset import MyTokenizedMidiDataset
+from modules.label_smoothing import LabelSmoothing
+from data.tokenizer import DstartEncoder, QuantizedMidiEncoder
+from utils import vocab_sizes, decode_and_output, calculate_average_distance
 
 
 def main(cfg: DictConfig, model: nn.Module, translation_dataset: Dataset, device: str = "cpu"):
@@ -46,7 +46,7 @@ def main(cfg: DictConfig, model: nn.Module, translation_dataset: Dataset, device
             src_mask=src_mask,
             max_len=cfg.dataset.sequence_len,
             start_symbol=start_symbol,
-            device=device
+            device=device,
         )
 
         target = tgt[1:-1].to(device)
@@ -56,7 +56,8 @@ def main(cfg: DictConfig, model: nn.Module, translation_dataset: Dataset, device
         total_loss += loss.item()
         total_dist += calculate_average_distance(out, target).cpu()
 
-        pbar.set_description(f"average distance: {total_dist / counter:3.3}, average loss: {total_loss / counter:3.3}")
+        desc = f"average distance: {total_dist / counter:3.3f}, average loss: {total_loss / counter:3.3f}"
+        pbar.set_description(desc)
 
     avg_loss = total_loss / len(dataset)
     avg_dist = total_dist / len(dataset)

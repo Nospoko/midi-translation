@@ -5,4 +5,3 @@ random_examples: False
 device: "cpu"
 dataset_name: "roszcz/maestro-v1-sustain"
 split: "test"
-
