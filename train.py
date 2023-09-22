@@ -19,7 +19,7 @@ def main(cfg: DictConfig):
     initialize_wandb(cfg)
     if cfg.target == "velocity":
         velocity_pipeline.main(cfg)
-    elif cfg.targer == "dstart":
+    elif cfg.target == "dstart":
         dstart_pipeline.main(cfg)
 
 
