@@ -110,7 +110,7 @@ def model_predictions_review(
 
     # load translation dataset and create MyTokenizedMidiDataset
     src_encoder = QuantizedMidiEncoder(quantization_cfg=train_cfg.dataset.quantization)
-    tgt_encoder = DstartEncoder()
+    tgt_encoder = DstartEncoder(n_bins=train_cfg.dstart_bins)
     translation_dataset = load_cache_dataset(
         dataset_name=dataset_name,
         dataset_cfg=dataset_cfg,
@@ -153,7 +153,7 @@ def model_predictions_review(
             sequence_size=train_cfg.dataset.sequence_len,
         )
 
-        # Just pitches and quantization bins of the source
+        # Just pitches and quantization n_bins of the source
         src_tokens = [dataset.src_encoder.vocab[token_id] for token_id in src_token_ids if token_id != pad_idx]
         source_df = dataset.src_encoder.untokenize(src_tokens)
 
@@ -172,7 +172,7 @@ def model_predictions_review(
         quantized_dstart_df = true_piece.df.copy()
 
         # change untokenized velocities to model predictions
-        pred_piece_df["start"] = tgt_encoder.unquantized_start(generated_dstart["dstart_bin"])
+        pred_piece_df["start"] = tgt_encoder.unquantized_start(generated_dstart)
         pred_piece_df["end"] = pred_piece_df["start"] + pred_piece_df["duration"]
 
         quantized_dstart_df["start"] = quantized_piece.df["start"].copy()

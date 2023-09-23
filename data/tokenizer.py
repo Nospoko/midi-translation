@@ -131,10 +131,10 @@ class VelocityEncoder(MidiEncoder):
 
 
 class DstartEncoder(MidiEncoder):
-    def __init__(self, bins: int = 200):
+    def __init__(self, n_bins: int = 200):
         super().__init__()
         self.specials = ["<s>", "</s>", "<blank>"]
-        self.bins = bins
+        self.bins = n_bins
         # Make a copy of special tokens ...
         self.vocab = list(self.specials)
         # ... and add velocity tokens
@@ -168,7 +168,7 @@ class DstartEncoder(MidiEncoder):
     def vocab_size(self) -> int:
         return len(self.vocab)
 
-    def unquantized_start(self, dstart_bins: pd.Series) -> pd.Series:
+    def unquantized_start(self, dstart_bins: np.array) -> np.array:
         quant_dstart = [self.bin_to_dstart[it] for it in dstart_bins]
         start = pd.Series(quant_dstart).cumsum().shift(1).fillna(0)
 
@@ -195,8 +195,7 @@ class DstartEncoder(MidiEncoder):
         tokens = ["<s>"] + tokens + ["</s>"]
         return tokens
 
-    def untokenize(self, tokens: list[str]) -> pd.DataFrame:
+    def untokenize(self, tokens: list[str]) -> list[int]:
         dstarts = [int(token) for token in tokens if token not in self.specials]
-        df = pd.DataFrame(dstarts, columns=["dstart_bin"])
 
-        return df
+        return dstarts

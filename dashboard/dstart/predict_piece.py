@@ -10,8 +10,8 @@ from omegaconf import DictConfig
 
 from data.quantizer import MidiQuantizer
 from modules.label_smoothing import LabelSmoothing
-from dashboard.components import piece_selector, download_button
 from data.tokenizer import DstartEncoder, QuantizedMidiEncoder
+from dashboard.components import piece_selector, download_button
 from data.dataset import MyTokenizedMidiDataset, quantized_piece_to_records
 from utils import vocab_sizes, piece_av_files, decode_and_output, calculate_average_distance
 
@@ -25,7 +25,7 @@ def predict_piece_dashboard(
 ):
     # Prepare everything required to make inference
     src_encoder = QuantizedMidiEncoder(train_cfg.dataset.quantization)
-    tgt_encoder = DstartEncoder(bins=train_cfg.dstart_bins)
+    tgt_encoder = DstartEncoder(n_bins=train_cfg.dstart_bins)
 
     piece, piece_descriptor = piece_selector(dataset_name=train_cfg.dataset_name)
 
@@ -89,7 +89,7 @@ def predict_piece_dashboard(
     predicted_piece_df = piece.df.copy()
     predicted_piece_df = predicted_piece_df.head(len(predictions))
 
-    predicted_piece_df["start"] = tgt_encoder.unquantized_start(predictions["dstart_bin"])
+    predicted_piece_df["start"] = tgt_encoder.unquantized_start(predictions)
     predicted_piece_df["end"] = predicted_piece_df["start"] + predicted_piece_df["duration"]
     predicted_piece = MidiPiece(predicted_piece_df)
 

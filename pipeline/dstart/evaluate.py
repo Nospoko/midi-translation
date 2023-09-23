@@ -11,7 +11,7 @@ from utils import vocab_sizes, decode_and_output, calculate_average_distance
 
 def main(cfg: DictConfig, model: nn.Module, translation_dataset: Dataset, device: str = "cpu"):
     src_encoder = QuantizedMidiEncoder(quantization_cfg=cfg.dataset.quantization)
-    tgt_encoder = DstartEncoder(bins=cfg.dstart_bins)
+    tgt_encoder = DstartEncoder(n_bins=cfg.dstart_bins)
 
     dataset = MyTokenizedMidiDataset(
         dataset=translation_dataset,

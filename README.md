@@ -33,7 +33,7 @@ flowchart TD
 
 You can train the model to predict dstart:
 ```shell
-python train.py --config-name=dstart_conf
+python train.py --config-name=dstart
 
 ```
 or velocity:

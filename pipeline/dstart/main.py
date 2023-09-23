@@ -7,7 +7,7 @@ from data.dataset import MyTokenizedMidiDataset, load_cache_dataset
 
 def load_datasets(cfg: DictConfig) -> tuple[MyTokenizedMidiDataset, MyTokenizedMidiDataset]:
     src_encoder = QuantizedMidiEncoder(quantization_cfg=cfg.dataset.quantization)
-    tgt_encoder = DstartEncoder(bins=cfg.dstart_bins)
+    tgt_encoder = DstartEncoder(n_bins=cfg.dstart_bins)
     train_translation_dataset = load_cache_dataset(
         dataset_cfg=cfg.dataset,
         dataset_name=cfg.dataset_name,

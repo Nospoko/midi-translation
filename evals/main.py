@@ -21,7 +21,7 @@ def load_model_checkpoint(cfg: DictConfig) -> dict:
     return torch.load(model_path, map_location=cfg.device)
 
 
-@hydra.main(version_base=None, config_path="../configs", config_name="eval_conf")
+@hydra.main(version_base=None, config_path="../configs", config_name="eval")
 def main(cfg: DictConfig):
     checkpoint = load_model_checkpoint(cfg)
     train_cfg = OmegaConf.create(checkpoint["cfg"])

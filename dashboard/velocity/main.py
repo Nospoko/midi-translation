@@ -157,7 +157,7 @@ def model_predictions_review(
             sequence_size=train_cfg.dataset.sequence_len,
         )
 
-        # Just pitches and quantization bins of the source
+        # Just pitches and quantization n_bins of the source
         src_tokens = [dataset.src_encoder.vocab[token_id] for token_id in src_token_ids if token_id != pad_idx]
         source_df = dataset.src_encoder.untokenize(src_tokens)
 
