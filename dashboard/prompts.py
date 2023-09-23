@@ -139,7 +139,7 @@ def render_prompt_results(
         gt_piece=gt_piece,
         velocity_prompt=prompt,
         quantized_prompt=quantizer.quantize_velocity(prompt),
-        generated_velocity=v1_velocity.values,
+        generated_velocity=v1_velocity,
     )
 
     st.markdown(f"### {prompt_title}")

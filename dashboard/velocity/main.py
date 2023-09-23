@@ -29,9 +29,9 @@ with st.sidebar:
 def main():
     with st.sidebar:
         dashboards = [
-            "Creative Prompts",
             "Sequence predictions",
             "Piece predictions",
+            "Creative Prompts",
         ]
         mode = st.selectbox(label="Display", options=dashboards)
 

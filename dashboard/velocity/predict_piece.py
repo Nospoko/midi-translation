@@ -88,7 +88,7 @@ def predict_piece_dashboard(
     predicted_piece_df = piece.df.copy()
     predicted_piece_df = predicted_piece_df.head(len(pred_velocities))
 
-    predicted_piece_df["velocity"] = pred_velocities.fillna(0)
+    predicted_piece_df["velocity"] = pred_velocities
     predicted_piece = MidiPiece(predicted_piece_df)
 
     predicted_piece.source = piece.source.copy()

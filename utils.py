@@ -101,6 +101,7 @@ def generate_sequence(
         device=device,
     )
 
+    sequence = [tgt_encoder.vocab[idx] for idx in sequence]
     out_sequence = tgt_encoder.untokenize(sequence)
 
     return out_sequence

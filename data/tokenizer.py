@@ -123,11 +123,10 @@ class VelocityEncoder(MidiEncoder):
         tokens = ["<s>"] + velocity_tokens + ["</s>"]
         return tokens
 
-    def untokenize(self, tokens: list[str]) -> pd.DataFrame:
+    def untokenize(self, tokens: list[str]) -> list[int]:
         velocities = [int(token) for token in tokens if token not in self.specials]
-        df = pd.DataFrame(velocities, columns=["velocity"])
 
-        return df
+        return velocities
 
 
 class DstartEncoder(MidiEncoder):
