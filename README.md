@@ -43,11 +43,11 @@ python train.py
 
 #### Tokenization method
 
-You can train the model to learn to predict high-resolution velocity (128 values)
-from data quantized into up to 10 bins.
+You can train the model on
+data quantized into up to 10 bins.
 
 
-For example, f you want to use 5 bins for dstart, 4 for duration and 1 for velocity, you need to specify bins hyperparameter:
+For example, if you want to use 5 bins for dstart, 4 for duration and 1 for velocity, you need to specify dataset.quantization hyperparameters:
 ```shell
 python train.py dataset.quantization.dstart=5 dataset.quantization.duration=4 dataset.quantization.velocity=1
 ```
@@ -121,7 +121,7 @@ Run the same command and choose "Model predictions" option.
 
 #### Predict piece
 
-You can choose a model to predict velocities of any piece from test dataset.
+You can choose a model to predict velocities or dstart of any piece from test dataset.
 ![image](https://github.com/Nospoko/midi-translation/assets/74838859/d8a1f536-26d1-4eb1-9393-2f0353e76cd9)
 
 
