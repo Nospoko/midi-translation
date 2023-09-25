@@ -101,8 +101,8 @@ def generate_sequence(
         device=device,
     )
 
-    sequence = [tgt_encoder.vocab[idx] for idx in sequence]
-    out_sequence = tgt_encoder.untokenize(sequence)
+    tokens = [tgt_encoder.vocab[idx] for idx in sequence]
+    out_sequence = tgt_encoder.untokenize(tokens)
 
     return out_sequence
 
