@@ -1,0 +1,7 @@
+run_name: "midi-transformer-2023-09-21-08-29"
+
+n_examples: 5
+random_examples: False
+device: "cpu"
+dataset_name: "roszcz/maestro-v1-sustain"
+split: "test"

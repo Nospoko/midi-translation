@@ -9,16 +9,16 @@ import torch.nn as nn
 import streamlit as st
 from fortepyan import MidiPiece
 from omegaconf import OmegaConf, DictConfig
+from predict_piece import predict_piece_dashboard
 
 from model import make_model
 from data.quantizer import MidiQuantizer
-from data.dataset import load_cache_dataset
-from dashboard.prompts import creative_prompts
-from dashboard.predict_piece import predict_piece_dashboard
+from data.tokenizer import DstartEncoder, QuantizedMidiEncoder
 from utils import vocab_sizes, piece_av_files, generate_sequence
+from data.dataset import MyTokenizedMidiDataset, load_cache_dataset
 
 # Set the layout of the Streamlit page
-st.set_page_config(layout="wide", page_title="Velocity Transformer", page_icon=":musical_keyboard")
+st.set_page_config(layout="wide", page_title="Dstart Transformer", page_icon=":musical_keyboard")
 
 with st.sidebar:
     devices = ["cpu"] + [f"cuda:{it}" for it in range(torch.cuda.device_count())]
@@ -28,15 +28,14 @@ with st.sidebar:
 def main():
     with st.sidebar:
         dashboards = [
-            "Creative Prompts",
-            "Piece predictions",
             "Sequence predictions",
+            "Piece predictions",
         ]
         mode = st.selectbox(label="Display", options=dashboards)
 
     with st.sidebar:
         # Show available checkpoints
-        options = glob.glob("models/*.pt")
+        options = glob.glob("checkpoints/dstart/*.pt")
         options.sort()
         checkpoint_path = st.selectbox(label="model", options=options)
         st.markdown("Selected checkpoint:")
@@ -79,7 +78,7 @@ def main():
         n_duration_bins=train_cfg.dataset.quantization.duration,
         n_velocity_bins=train_cfg.dataset.quantization.velocity,
     )
-    st.markdown(f"Velocity bins: {quantizer.velocity_bin_edges}")
+    st.markdown(f"Dstart bins: {quantizer.dstart_bin_edges}")
 
     n_parameters = sum(p.numel() for p in model.parameters()) / 1e6
     st.markdown(f"Model parameters: {n_parameters:.3f}M")
@@ -89,12 +88,11 @@ def main():
 
     if not os.path.exists(model_dir):
         os.mkdir(model_dir)
-    if mode == "Piece predictions":
-        predict_piece_dashboard(model, quantizer, train_cfg, model_dir)
+
     if mode == "Sequence predictions":
         model_predictions_review(model, quantizer, train_cfg, model_dir)
-    if mode == "Creative Prompts":
-        creative_prompts(model, quantizer, train_cfg, model_dir)
+    if mode == "Piece predictions":
+        predict_piece_dashboard(model, quantizer, train_cfg, model_dir)
 
 
 def model_predictions_review(
@@ -110,23 +108,31 @@ def model_predictions_review(
 
     random_seed = st.selectbox(label="random seed", options=range(20))
 
-    dataset = load_cache_dataset(
+    # load translation dataset and create MyTokenizedMidiDataset
+    src_encoder = QuantizedMidiEncoder(quantization_cfg=train_cfg.dataset.quantization)
+    tgt_encoder = DstartEncoder(n_bins=train_cfg.dstart_bins)
+    translation_dataset = load_cache_dataset(
         dataset_name=dataset_name,
         dataset_cfg=dataset_cfg,
         split=split,
+    )
+    dataset = MyTokenizedMidiDataset(
+        dataset=translation_dataset,
+        dataset_cfg=dataset_cfg,
+        src_encoder=src_encoder,
+        tgt_encoder=tgt_encoder,
     )
 
     n_samples = 5
     np.random.seed(random_seed)
     idxs = np.random.randint(len(dataset), size=n_samples)
-
     pad_idx = dataset.src_encoder.token_to_id["<blank>"]
 
     cols = st.columns(3)
     with cols[0]:
         st.markdown("### Unchanged")
     with cols[1]:
-        st.markdown("### Q. velocity")
+        st.markdown("### Q. Dstart")
     with cols[2]:
         st.markdown("### Predicted")
 
@@ -138,7 +144,7 @@ def model_predictions_review(
         record_source = json.loads(record["source"])
         src_token_ids = record["source_token_ids"]
 
-        generated_velocity = generate_sequence(
+        generated_dstart = generate_sequence(
             model=model,
             device=DEVICE,
             pad_idx=pad_idx,
@@ -147,7 +153,7 @@ def model_predictions_review(
             sequence_size=train_cfg.dataset.sequence_len,
         )
 
-        # Just pitches and quantization bins of the source
+        # Just pitches and quantization n_bins of the source
         src_tokens = [dataset.src_encoder.vocab[token_id] for token_id in src_token_ids if token_id != pad_idx]
         source_df = dataset.src_encoder.untokenize(src_tokens)
 
@@ -163,17 +169,18 @@ def model_predictions_review(
         true_piece.time_shift(-true_piece.df.start.min())
 
         pred_piece_df = true_piece.df.copy()
-        quantized_vel_df = true_piece.df.copy()
+        quantized_dstart_df = true_piece.df.copy()
 
         # change untokenized velocities to model predictions
-        pred_piece_df["velocity"] = generated_velocity
-        pred_piece_df["velocity"] = pred_piece_df["velocity"].fillna(0)
+        pred_piece_df["start"] = tgt_encoder.unquantized_start(generated_dstart)
+        pred_piece_df["end"] = pred_piece_df["start"] + pred_piece_df["duration"]
 
-        quantized_vel_df["velocity"] = quantized_piece.df["velocity"].copy()
+        quantized_dstart_df["start"] = quantized_piece.df["start"].copy()
+        quantized_dstart_df["end"] = quantized_piece.df["start"] + true_piece.df["duration"]
 
         # create quantized piece with predicted velocities
         pred_piece = MidiPiece(pred_piece_df)
-        quantized_vel_piece = MidiPiece(quantized_vel_df)
+        quantized_vel_piece = MidiPiece(quantized_dstart_df)
 
         pred_piece.source = true_piece.source.copy()
         quantized_vel_piece.source = true_piece.source.copy()

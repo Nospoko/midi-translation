@@ -8,8 +8,8 @@ from datasets import Dataset, load_dataset
 from omegaconf import OmegaConf, DictConfig
 from torch.utils.data import Dataset as TorchDataset
 
+from data.tokenizer import MidiEncoder
 from data.quantizer import MidiQuantizer
-from data.tokenizer import MidiEncoder, VelocityEncoder, QuantizedMidiEncoder
 
 
 def build_translation_dataset(
@@ -117,29 +117,19 @@ def load_cache_dataset(
     dataset_name: str,
     split: str,
     force_build: bool = False,
-) -> MyTokenizedMidiDataset:
+) -> Dataset:
     # Prepare caching hash
     config_hash = hashlib.sha256()
     config_string = json.dumps(OmegaConf.to_container(dataset_cfg)) + split + dataset_name
     config_hash.update(config_string.encode())
     config_hash = config_hash.hexdigest()
 
-    # Prepare midi encoders
-    src_encoder = QuantizedMidiEncoder(dataset_cfg.quantization)
-    tgt_encoder = VelocityEncoder()
-
     dataset_cache_path = f"tmp/datasets/{config_hash}"
+
     if not force_build:
         try:
             translation_dataset = Dataset.load_from_disk(dataset_cache_path)
-
-            tokenized_dataset = MyTokenizedMidiDataset(
-                dataset=translation_dataset,
-                dataset_cfg=dataset_cfg,
-                src_encoder=src_encoder,
-                tgt_encoder=tgt_encoder,
-            )
-            return tokenized_dataset
+            return translation_dataset
         except Exception as e:
             print("Failed loading cached dataset:", e)
 
@@ -151,10 +141,4 @@ def load_cache_dataset(
     )
     translation_dataset.save_to_disk(dataset_cache_path)
 
-    tokenized_dataset = MyTokenizedMidiDataset(
-        dataset=translation_dataset,
-        dataset_cfg=dataset_cfg,
-        src_encoder=src_encoder,
-        tgt_encoder=tgt_encoder,
-    )
-    return tokenized_dataset
+    return translation_dataset

@@ -1,10 +1,16 @@
 import itertools
 
+import yaml
+import numpy as np
 import pandas as pd
 from omegaconf import DictConfig
+from hydra.utils import to_absolute_path
 
 
 class MidiEncoder:
+    def __init__(self):
+        self.token_to_id = None
+
     def tokenize(self, record: dict) -> list[str]:
         raise NotImplementedError("Your encoder needs *tokenize* implementation")
 
@@ -25,6 +31,7 @@ class MidiEncoder:
 
 class QuantizedMidiEncoder(MidiEncoder):
     def __init__(self, quantization_cfg: DictConfig):
+        super().__init__()
         self.quantization_cfg = quantization_cfg
         self.keys = ["pitch", "dstart_bin", "duration_bin", "velocity_bin"]
         self.specials = ["<s>", "</s>", "<blank>"]
@@ -86,6 +93,7 @@ class QuantizedMidiEncoder(MidiEncoder):
 
 class VelocityEncoder(MidiEncoder):
     def __init__(self):
+        super().__init__()
         self.key = "velocity"
         self.specials = ["<s>", "</s>", "<blank>"]
 
@@ -115,8 +123,78 @@ class VelocityEncoder(MidiEncoder):
         tokens = ["<s>"] + velocity_tokens + ["</s>"]
         return tokens
 
-    def untokenize(self, tokens: list[str]) -> pd.DataFrame:
+    def untokenize(self, tokens: list[str]) -> list[int]:
         velocities = [int(token) for token in tokens if token not in self.specials]
-        df = pd.DataFrame(velocities, columns=["velocity"])
 
-        return df
+        return velocities
+
+
+class DstartEncoder(MidiEncoder):
+    def __init__(self, n_bins: int = 200):
+        super().__init__()
+        self.specials = ["<s>", "</s>", "<blank>"]
+        self.bins = n_bins
+        # Make a copy of special tokens ...
+        self.vocab = list(self.specials)
+        # ... and add velocity tokens
+        self._build_vocab()
+        self._bin_edges = self._load_bin_edges()
+        self.bin_to_dstart = []
+        self._build_dstart_decoder()
+        self.token_to_id = {token: it for it, token in enumerate(self.vocab)}
+
+    def _load_bin_edges(self):
+        artifacts_path = to_absolute_path("artifacts/bin_edges.yaml")
+        with open(artifacts_path, "r") as f:
+            bin_edges = yaml.safe_load(f)
+
+        dstart_bin_edges = bin_edges["dstart"][self.bins]
+        return dstart_bin_edges
+
+    def _build_vocab(self):
+        self.vocab += [str(possible_bin) for possible_bin in range(self.bins)]
+
+    def _build_dstart_decoder(self):
+        self.bin_to_dstart = []
+        for it in range(1, len(self._bin_edges)):
+            dstart = (self._bin_edges[it - 1] + self._bin_edges[it]) / 2
+            self.bin_to_dstart.append(dstart)
+
+        last_dstart = 2 * self._bin_edges[-1]
+        self.bin_to_dstart.append(last_dstart)
+
+    @property
+    def vocab_size(self) -> int:
+        return len(self.vocab)
+
+    def unquantized_start(self, dstart_bins: np.array) -> np.array:
+        quant_dstart = [self.bin_to_dstart[it] for it in dstart_bins]
+        start = pd.Series(quant_dstart).cumsum().shift(1).fillna(0)
+
+        return start
+
+    def quantize(self, start: list[float]) -> list[int]:
+        dstart = []
+        for it in range(len(start) - 1):
+            dstart.append(start[it + 1] - start[it])
+        dstart.append(0)
+
+        dstart_bins = np.digitize(dstart, self._bin_edges) - 1
+
+        return dstart_bins
+
+    def tokenize(self, record: dict) -> list[str]:
+        # TODO I don't love the idea of adding tokens durint *tokenize* call
+        # If we want to pretend that our midi sequences have start and finish
+        # we should take care of that before we get here :alarm:
+        dstart_bins = self.quantize(record["start"])
+
+        # get tokens from quantized data
+        tokens = [str(dstart_bin) for dstart_bin in dstart_bins]
+        tokens = ["<s>"] + tokens + ["</s>"]
+        return tokens
+
+    def untokenize(self, tokens: list[str]) -> list[int]:
+        dstarts = [int(token) for token in tokens if token not in self.specials]
+
+        return dstarts
