@@ -25,6 +25,7 @@ with st.sidebar:
     DEVICE = st.selectbox(label="Processing device", options=devices)
 
 
+@torch.no_grad()
 def main():
     with st.sidebar:
         dashboards = [

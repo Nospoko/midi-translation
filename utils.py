@@ -16,12 +16,12 @@ from modules.encoderdecoder import subsequent_mask
 
 def vocab_sizes(cfg: DictConfig) -> tuple[int, int]:
     bins = cfg.dataset.quantization
-    # + 2 if for <s> and </s> tokens
-    src_vocab_size = 2 + 88 * bins.dstart * bins.velocity * bins.duration
+    # + 1 if for <s> token
+    src_vocab_size = 1 + 88 * bins.dstart * bins.velocity * bins.duration
     if cfg.target == "velocity":
-        tgt_vocab_size = 128 + 2
+        tgt_vocab_size = 128 + 1
     elif cfg.target == "dstart":
-        tgt_vocab_size = cfg.dstart_bins + 2
+        tgt_vocab_size = cfg.dstart_bins + 1
     else:
         tgt_vocab_size = None
     return src_vocab_size, tgt_vocab_size

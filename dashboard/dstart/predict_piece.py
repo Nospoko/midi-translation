@@ -75,7 +75,7 @@ def predict_piece_dashboard(
         out_tokens = [tgt_encoder.vocab[x] for x in predicted_token_ids]
         predicted_tokens += out_tokens
 
-        target = tgt_token_ids[1:-1].to(train_cfg.device)
+        target = tgt_token_ids[1:].to(train_cfg.device)
         # minimal change to count tokens without padding idx
         n_tokens = (target != -1).data.sum()
         loss = criterion(probabilities, target) / n_tokens

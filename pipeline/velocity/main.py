@@ -12,12 +12,12 @@ def load_datasets(cfg: DictConfig) -> tuple[MyTokenizedMidiDataset, MyTokenizedM
     train_translation_dataset = load_cache_dataset(
         dataset_cfg=cfg.dataset,
         dataset_name=cfg.dataset_name,
-        split="train[:1]",
+        split="train",
     )
     val_translation_dataset = load_cache_dataset(
         dataset_cfg=cfg.dataset,
         dataset_name=cfg.dataset_name,
-        split="validation[:1]",
+        split="validation",
     )
 
     train_dataset = MyTokenizedMidiDataset(
