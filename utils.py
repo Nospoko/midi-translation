@@ -16,14 +16,12 @@ from modules.encoderdecoder import subsequent_mask
 
 def vocab_sizes(cfg: DictConfig) -> tuple[int, int]:
     bins = cfg.dataset.quantization
-
-    # +3 is for special tokens we don't really use right now
-
-    src_vocab_size = 3 + 88 * bins.dstart * bins.velocity * bins.duration
+    # + 2 if for <s> and </s> tokens
+    src_vocab_size = 2 + 88 * bins.dstart * bins.velocity * bins.duration
     if cfg.target == "velocity":
-        tgt_vocab_size = 128 + 3
+        tgt_vocab_size = 128 + 2
     elif cfg.target == "dstart":
-        tgt_vocab_size = cfg.dstart_bins + 3
+        tgt_vocab_size = cfg.dstart_bins + 2
     else:
         tgt_vocab_size = None
     return src_vocab_size, tgt_vocab_size
@@ -85,19 +83,18 @@ def learning_rate_schedule(step: int, model_size: int, factor: float, warmup: in
 def generate_sequence(
     src_tokens: torch.Tensor,
     tgt_encoder: MidiEncoder,
-    pad_idx: int,
     model: nn.Module,
     sequence_size: int,
     device: str = "cpu",
 ) -> pd.DataFrame:
-    src_mask = (src_tokens != pad_idx).unsqueeze(-2)
+    # TODO: src_mask is just [True] * len(src_tokens) now
+    src_mask = (src_tokens != -1).unsqueeze(-2)
 
     sequence = greedy_decode(
         model=model,
         src=src_tokens,
         src_mask=src_mask,
         max_len=sequence_size,
-        start_symbol=0,
         device=device,
     )
 
@@ -112,7 +109,6 @@ def greedy_decode(
     src: torch.Tensor,
     src_mask: torch.Tensor,
     max_len: int,
-    start_symbol: int,
     device: str = "cpu",
 ) -> torch.Tensor:
     dev = torch.device(device)
@@ -121,8 +117,8 @@ def greedy_decode(
     src_mask = src_mask.unsqueeze(0).to(dev)
 
     memory = model.encode(src, src_mask)
-    # Create a tensor and put start symbol inside
-    sentence = torch.Tensor([[start_symbol]]).type_as(src.data).to(dev)
+    # Create a tensor and put start symbol inside - 0 is <s> token idx
+    sentence = torch.Tensor([[0]]).type_as(src.data).to(dev)
     for _ in range(max_len):
         sub_mask = subsequent_mask(sentence.size(1)).type_as(src.data).to(dev)
         out = model.decode(memory, src_mask, sentence, sub_mask)
@@ -142,7 +138,6 @@ def decode_and_output(
     src: torch.Tensor,
     src_mask: torch.Tensor,
     max_len: int,
-    start_symbol: int,
     device: str = "cpu",
 ) -> tuple[torch.Tensor, torch.Tensor]:
     dev = torch.device(device)
@@ -151,13 +146,12 @@ def decode_and_output(
     src_mask = src_mask.unsqueeze(0).to(dev)
 
     memory = model.encode(src, src_mask)
-    # Create a tensor and put start symbol inside
-    sentence = torch.Tensor([[start_symbol]]).type_as(src.data).to(dev)
+    # Create tensors for sentence and model output, 0 is <s> token idx
+    sentence = torch.Tensor([[0]]).type_as(src.data).to(dev)
     probabilities = torch.Tensor([]).to(dev)
     for _ in range(max_len):
         sub_mask = subsequent_mask(sentence.size(1)).type_as(src.data).to(dev)
         out = model.decode(memory, src_mask, sentence, sub_mask)
-
         prob = model.generator(out[:, -1])
         next_word = prob.argmax(dim=1)
         next_word = next_word.data[0]

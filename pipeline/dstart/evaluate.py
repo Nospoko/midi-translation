@@ -20,14 +20,11 @@ def main(cfg: DictConfig, model: nn.Module, translation_dataset: Dataset, device
         tgt_encoder=tgt_encoder,
     )
 
-    pad_idx = src_encoder.token_to_id["<blank>"]
-    start_symbol = src_encoder.token_to_id["<s>"]
     total_loss = 0
     total_dist = 0
     _, tgt_vocab_size = vocab_sizes(cfg)
     criterion = LabelSmoothing(
         size=tgt_vocab_size,
-        padding_idx=pad_idx,
         smoothing=cfg.train.label_smoothing,
     )
     criterion.to(device)
@@ -38,19 +35,18 @@ def main(cfg: DictConfig, model: nn.Module, translation_dataset: Dataset, device
         src = record["source_token_ids"]
         tgt = record["target_token_ids"]
 
-        src_mask = (src != pad_idx).unsqueeze(-2)
+        src_mask = (src != -1).unsqueeze(-2)
 
         _, out = decode_and_output(
             model=model,
             src=src,
             src_mask=src_mask,
             max_len=cfg.dataset.sequence_len,
-            start_symbol=start_symbol,
             device=device,
         )
 
         target = tgt[1:-1].to(device)
-        n_tokens = (target != pad_idx).data.sum()
+        n_tokens = (target != -1).data.sum()
 
         loss = criterion(out, target) / n_tokens
         total_loss += loss.item()

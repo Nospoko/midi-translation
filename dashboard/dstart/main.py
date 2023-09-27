@@ -126,7 +126,6 @@ def model_predictions_review(
     n_samples = 5
     np.random.seed(random_seed)
     idxs = np.random.randint(len(dataset), size=n_samples)
-    pad_idx = dataset.src_encoder.token_to_id["<blank>"]
 
     cols = st.columns(3)
     with cols[0]:
@@ -147,14 +146,13 @@ def model_predictions_review(
         generated_dstart = generate_sequence(
             model=model,
             device=DEVICE,
-            pad_idx=pad_idx,
             src_tokens=src_token_ids,
             tgt_encoder=dataset.tgt_encoder,
             sequence_size=train_cfg.dataset.sequence_len,
         )
 
         # Just pitches and quantization n_bins of the source
-        src_tokens = [dataset.src_encoder.vocab[token_id] for token_id in src_token_ids if token_id != pad_idx]
+        src_tokens = [dataset.src_encoder.vocab[token_id] for token_id in src_token_ids]
         source_df = dataset.src_encoder.untokenize(src_tokens)
 
         quantized_notes = quantizer.apply_quantization(source_df)

@@ -34,11 +34,11 @@ class QuantizedMidiEncoder(MidiEncoder):
         super().__init__()
         self.quantization_cfg = quantization_cfg
         self.keys = ["pitch", "dstart_bin", "duration_bin", "velocity_bin"]
-        self.specials = ["<s>", "</s>", "<blank>"]
-        # Make a copy of special tokens ...
+        self.specials = ["<s>", "</s>"]
+
         self.vocab = list(self.specials)
 
-        # ... and add midi tokens
+        # add midi tokens to vocab
         self._build_vocab()
         self.token_to_id = {token: it for it, token in enumerate(self.vocab)}
 
@@ -64,15 +64,11 @@ class QuantizedMidiEncoder(MidiEncoder):
             self.vocab.append(key)
 
     def tokenize(self, record: dict) -> list[str]:
-        # TODO I don't love the idea of adding tokens durint *tokenize* call
-        # If we want to pretend that our midi sequences have start and finish
-        # we should take care of that before we get here :alarm:
         tokens = ["<s>"]
         n_samples = len(record[self.keys[0]])
         for idx in range(n_samples):
             token = "-".join([f"{record[key][idx]:0.0f}" for key in self.keys])
             tokens.append(token)
-
         tokens.append("</s>")
         return tokens
 
@@ -95,12 +91,10 @@ class VelocityEncoder(MidiEncoder):
     def __init__(self):
         super().__init__()
         self.key = "velocity"
-        self.specials = ["<s>", "</s>", "<blank>"]
-
-        # Make a copy of special tokens ...
+        self.specials = ["<s>", "</s>"]
         self.vocab = list(self.specials)
 
-        # ... and add velocity tokens
+        # add velocity tokens
         self._build_vocab()
         self.token_to_id = {token: it for it, token in enumerate(self.vocab)}
 
@@ -116,11 +110,7 @@ class VelocityEncoder(MidiEncoder):
         self.vocab += [str(possible_velocity) for possible_velocity in range(128)]
 
     def tokenize(self, record: dict) -> list[str]:
-        # TODO I don't love the idea of adding tokens durint *tokenize* call
-        # If we want to pretend that our midi sequences have start and finish
-        # we should take care of that before we get here :alarm:
-        velocity_tokens = [str(velocity) for velocity in record["velocity"]]
-        tokens = ["<s>"] + velocity_tokens + ["</s>"]
+        tokens = ["<s>"] + [str(velocity) for velocity in record["velocity"]] + ["</s>"]
         return tokens
 
     def untokenize(self, tokens: list[str]) -> list[int]:
@@ -132,11 +122,11 @@ class VelocityEncoder(MidiEncoder):
 class DstartEncoder(MidiEncoder):
     def __init__(self, n_bins: int = 200):
         super().__init__()
-        self.specials = ["<s>", "</s>", "<blank>"]
+        self.specials = ["<s>", "</s>"]
         self.bins = n_bins
-        # Make a copy of special tokens ...
+
         self.vocab = list(self.specials)
-        # ... and add velocity tokens
+        # add dstart tokens
         self._build_vocab()
         self._bin_edges = self._load_bin_edges()
         self.bin_to_dstart = []
@@ -184,14 +174,10 @@ class DstartEncoder(MidiEncoder):
         return dstart_bins
 
     def tokenize(self, record: dict) -> list[str]:
-        # TODO I don't love the idea of adding tokens durint *tokenize* call
-        # If we want to pretend that our midi sequences have start and finish
-        # we should take care of that before we get here :alarm:
         dstart_bins = self.quantize(record["start"])
 
         # get tokens from quantized data
-        tokens = [str(dstart_bin) for dstart_bin in dstart_bins]
-        tokens = ["<s>"] + tokens + ["</s>"]
+        tokens = ["<s>"] + [str(dstart_bin) for dstart_bin in dstart_bins] + ["</s>"]
         return tokens
 
     def untokenize(self, tokens: list[str]) -> list[int]:
