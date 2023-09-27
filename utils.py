@@ -87,7 +87,6 @@ def generate_sequence(
     sequence_size: int,
     device: str = "cpu",
 ) -> pd.DataFrame:
-
     sequence = greedy_decode(
         model=model,
         src=src_tokens,
@@ -110,9 +109,7 @@ def greedy_decode(
     dev = torch.device(device)
     # Pretend to be batches
     src = src.unsqueeze(0).to(dev)
-
-    src_mask = [True] * len(src[0])
-    src_mask = torch.tensor([[src_mask]])
+    src_mask = torch.ones_like(src, dtype=torch.bool).unsqueeze(0)
 
     memory = model.encode(src, src_mask)
     # Create a tensor and put start symbol inside - 0 is "" token idx
@@ -140,9 +137,7 @@ def decode_and_output(
     dev = torch.device(device)
     # Pretend to be batches
     src = src.unsqueeze(0).to(dev)
-
-    src_mask = [True] * len(src[0])
-    src_mask = torch.tensor([[src_mask]])
+    src_mask = torch.ones_like(src, dtype=torch.bool).unsqueeze(0)
 
     memory = model.encode(src, src_mask)
     # Create tensors for sentence and model output - 0 is "" token idx

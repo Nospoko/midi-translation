@@ -17,7 +17,7 @@ class Batch:
 
     def __init__(self, src: torch.Tensor, tgt: torch.Tensor):
         self.src = src
-        self.src_mask = (src != -1).unsqueeze(-2)
+        self.src_mask = torch.ones_like(src, dtype=torch.bool).unsqueeze(-2)
 
         self.tgt = tgt[:, :-1]
         self.tgt_y = tgt[:, 1:]
@@ -36,7 +36,7 @@ class Batch:
     @staticmethod
     def make_std_mask(tgt):
         """Create a mask to hide padding and future words."""
-        tgt_mask = (tgt != -1).unsqueeze(-2)
+        tgt_mask = torch.ones_like(tgt, dtype=torch.bool).unsqueeze(-2)
         tgt_mask = tgt_mask & subsequent_mask(tgt.size(-1)).type_as(tgt_mask.data)
         return tgt_mask
 
