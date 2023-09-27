@@ -17,7 +17,7 @@ class Batch:
 
     def __init__(self, src: torch.Tensor, tgt: torch.Tensor):
         self.src = src
-        self.src_mask = src.unsqueeze(-2)
+        self.src_mask = (src != -1).unsqueeze(-2)
 
         self.tgt = tgt[:, :-1]
         self.tgt_y = tgt[:, 1:]
