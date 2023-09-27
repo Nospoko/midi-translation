@@ -34,7 +34,7 @@ class QuantizedMidiEncoder(MidiEncoder):
         super().__init__()
         self.quantization_cfg = quantization_cfg
         self.keys = ["pitch", "dstart_bin", "duration_bin", "velocity_bin"]
-        self.specials = ["<s>"]
+        self.specials = [""]
 
         self.vocab = list(self.specials)
 
@@ -64,7 +64,7 @@ class QuantizedMidiEncoder(MidiEncoder):
             self.vocab.append(key)
 
     def tokenize(self, record: dict) -> list[str]:
-        tokens = ["<s>"]
+        tokens = [""]
         n_samples = len(record[self.keys[0]])
         for idx in range(n_samples):
             token = "-".join([f"{record[key][idx]:0.0f}" for key in self.keys])
@@ -91,7 +91,7 @@ class VelocityEncoder(MidiEncoder):
     def __init__(self):
         super().__init__()
         self.key = "velocity"
-        self.specials = ["<s>"]
+        self.specials = [""]
         self.vocab = list(self.specials)
 
         # add velocity tokens
@@ -110,7 +110,7 @@ class VelocityEncoder(MidiEncoder):
         self.vocab += [str(possible_velocity) for possible_velocity in range(128)]
 
     def tokenize(self, record: dict) -> list[str]:
-        tokens = ["<s>"] + [str(velocity) for velocity in record["velocity"]]
+        tokens = [""] + [str(velocity) for velocity in record["velocity"]]
         return tokens
 
     def untokenize(self, tokens: list[str]) -> list[int]:
@@ -122,7 +122,7 @@ class VelocityEncoder(MidiEncoder):
 class DstartEncoder(MidiEncoder):
     def __init__(self, n_bins: int = 200):
         super().__init__()
-        self.specials = ["<s>"]
+        self.specials = [""]
         self.bins = n_bins
 
         self.vocab = list(self.specials)
@@ -177,7 +177,7 @@ class DstartEncoder(MidiEncoder):
         dstart_bins = self.quantize(record["start"])
 
         # get tokens from quantized data
-        tokens = ["<s>"] + [str(dstart_bin) for dstart_bin in dstart_bins]
+        tokens = [""] + [str(dstart_bin) for dstart_bin in dstart_bins]
         return tokens
 
     def untokenize(self, tokens: list[str]) -> list[int]:

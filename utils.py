@@ -16,7 +16,7 @@ from modules.encoderdecoder import subsequent_mask
 
 def vocab_sizes(cfg: DictConfig) -> tuple[int, int]:
     bins = cfg.dataset.quantization
-    # + 1 if for <s> token
+    # + 1 if for "" token
     src_vocab_size = 1 + 88 * bins.dstart * bins.velocity * bins.duration
     if cfg.target == "velocity":
         tgt_vocab_size = 128 + 1
@@ -117,7 +117,7 @@ def greedy_decode(
     src_mask = src_mask.unsqueeze(0).to(dev)
 
     memory = model.encode(src, src_mask)
-    # Create a tensor and put start symbol inside - 0 is <s> token idx
+    # Create a tensor and put start symbol inside - 0 is "" token idx
     sentence = torch.Tensor([[0]]).type_as(src.data).to(dev)
     for _ in range(max_len):
         sub_mask = subsequent_mask(sentence.size(1)).type_as(src.data).to(dev)
@@ -146,7 +146,7 @@ def decode_and_output(
     src_mask = src_mask.unsqueeze(0).to(dev)
 
     memory = model.encode(src, src_mask)
-    # Create tensors for sentence and model output, 0 is <s> token idx
+    # Create tensors for sentence and model output, 0 is "" token idx
     sentence = torch.Tensor([[0]]).type_as(src.data).to(dev)
     probabilities = torch.Tensor([]).to(dev)
     for _ in range(max_len):
