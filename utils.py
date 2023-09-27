@@ -109,7 +109,7 @@ def greedy_decode(
     dev = torch.device(device)
     # Pretend to be batches
     src = src.unsqueeze(0).to(dev)
-    src_mask = torch.ones_like(src, dtype=torch.bool).unsqueeze(0)
+    src_mask = torch.ones_like(src, dtype=torch.bool).unsqueeze(0).to(dev)
 
     memory = model.encode(src, src_mask)
     # Create a tensor and put start symbol inside - 0 is "" token idx
@@ -137,7 +137,7 @@ def decode_and_output(
     dev = torch.device(device)
     # Pretend to be batches
     src = src.unsqueeze(0).to(dev)
-    src_mask = torch.ones_like(src, dtype=torch.bool).unsqueeze(0)
+    src_mask = torch.ones_like(src, dtype=torch.bool).unsqueeze(0).to(dev)
 
     memory = model.encode(src, src_mask)
     # Create tensors for sentence and model output - 0 is "" token idx
