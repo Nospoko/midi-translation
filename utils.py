@@ -87,12 +87,10 @@ def generate_sequence(
     sequence_size: int,
     device: str = "cpu",
 ) -> pd.DataFrame:
-    src_mask = (src_tokens != -1).unsqueeze(-2)
 
     sequence = greedy_decode(
         model=model,
         src=src_tokens,
-        src_mask=src_mask,
         max_len=sequence_size,
         device=device,
     )
