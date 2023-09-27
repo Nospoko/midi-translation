@@ -35,12 +35,9 @@ def main(cfg: DictConfig, model: nn.Module, translation_dataset: Dataset, device
         src = record["source_token_ids"]
         tgt = record["target_token_ids"]
 
-        src_mask = (src != -1).unsqueeze(-2)
-
         _, out = decode_and_output(
             model=model,
             src=src,
-            src_mask=src_mask,
             max_len=cfg.dataset.sequence_len,
             device=device,
         )

@@ -87,7 +87,6 @@ def generate_sequence(
     sequence_size: int,
     device: str = "cpu",
 ) -> pd.DataFrame:
-    # TODO: src_mask is just [True] * len(src_tokens) now
     src_mask = (src_tokens != -1).unsqueeze(-2)
 
     sequence = greedy_decode(
@@ -107,14 +106,15 @@ def generate_sequence(
 def greedy_decode(
     model: nn.Module,
     src: torch.Tensor,
-    src_mask: torch.Tensor,
     max_len: int,
     device: str = "cpu",
 ) -> torch.Tensor:
     dev = torch.device(device)
     # Pretend to be batches
     src = src.unsqueeze(0).to(dev)
-    src_mask = src_mask.unsqueeze(0).to(dev)
+
+    src_mask = [True] * len(src[0])
+    src_mask = torch.tensor([[src_mask]])
 
     memory = model.encode(src, src_mask)
     # Create a tensor and put start symbol inside - 0 is "" token idx
@@ -136,17 +136,18 @@ def greedy_decode(
 def decode_and_output(
     model: nn.Module,
     src: torch.Tensor,
-    src_mask: torch.Tensor,
     max_len: int,
     device: str = "cpu",
 ) -> tuple[torch.Tensor, torch.Tensor]:
     dev = torch.device(device)
     # Pretend to be batches
     src = src.unsqueeze(0).to(dev)
-    src_mask = src_mask.unsqueeze(0).to(dev)
+
+    src_mask = [True] * len(src[0])
+    src_mask = torch.tensor([[src_mask]])
 
     memory = model.encode(src, src_mask)
-    # Create tensors for sentence and model output, 0 is "" token idx
+    # Create tensors for sentence and model output - 0 is "" token idx
     sentence = torch.Tensor([[0]]).type_as(src.data).to(dev)
     probabilities = torch.Tensor([]).to(dev)
     for _ in range(max_len):

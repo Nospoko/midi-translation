@@ -60,12 +60,10 @@ def predict_piece_dashboard(
     for record in tqdm(dataset):
         src_token_ids = record["source_token_ids"]
         tgt_token_ids = record["target_token_ids"]
-        src_mask = (src_token_ids != -1).unsqueeze(-2)
 
         predicted_token_ids, probabilities = decode_and_output(
             model=model,
             src=src_token_ids,
-            src_mask=src_mask[0],
             max_len=train_cfg.dataset.sequence_len,
             device=train_cfg.device,
         )
