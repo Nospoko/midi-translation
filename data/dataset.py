@@ -117,7 +117,7 @@ class MyTokenizedMidiDataset(TorchDataset):
         cls_token_id = self.tgt_encoder.token_to_id["<CLS>"]
         src_token_ids.insert(0, cls_token_id)
         tgt_token_ids.insert(0, cls_token_id)
-        
+
         return src_token_ids, tgt_token_ids
 
 
@@ -144,6 +144,9 @@ def load_cache_dataset(
 
     print("Building translation dataset from", dataset_name, split)
     midi_dataset = load_dataset(dataset_name, split=split)
+
+    # make sure dataset.info contains dataset_name - giant-midi-sustain appears to do not
+    midi_dataset.info.dataset_name = dataset_name
     translation_dataset = build_translation_dataset(
         dataset=midi_dataset,
         dataset_cfg=dataset_cfg,

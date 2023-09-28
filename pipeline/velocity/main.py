@@ -9,16 +9,20 @@ def load_datasets(cfg: DictConfig) -> tuple[MyTokenizedMidiDataset, MyTokenizedM
     src_encoder = QuantizedMidiEncoder(quantization_cfg=cfg.dataset.quantization)
     tgt_encoder = VelocityEncoder()
 
-    train_translation_dataset = load_cache_dataset(
-        dataset_cfg=cfg.dataset,
-        dataset_name=cfg.dataset_name,
-        split="train",
-    )
-    val_translation_dataset = load_cache_dataset(
-        dataset_cfg=cfg.dataset,
-        dataset_name=cfg.dataset_name,
-        split="validation",
-    )
+    if "maestro" in cfg.dataset_name:
+        train_translation_dataset = load_cache_dataset(
+            dataset_cfg=cfg.dataset,
+            dataset_name=cfg.dataset_name,
+            split="train",
+        )
+        val_translation_dataset = load_cache_dataset(
+            dataset_cfg=cfg.dataset,
+            dataset_name=cfg.dataset_name,
+            split="validation",
+        )
+    else:
+        translation_dataset = load_cache_dataset(dataset_cfg=cfg.dataset, dataset_name=cfg.dataset_name, split="train")
+        train_translation_dataset, val_translation_dataset = translation_dataset.train_test_split(0.1).values()
 
     train_dataset = MyTokenizedMidiDataset(
         dataset=train_translation_dataset,
