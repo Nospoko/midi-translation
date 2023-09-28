@@ -1,6 +1,7 @@
 from omegaconf import DictConfig
 
 from training_utils import train_model
+from data.augmentation import augment_dataset
 from data.tokenizer import DstartEncoder, QuantizedMidiEncoder
 from data.dataset import MyTokenizedMidiDataset, load_cache_dataset
 
@@ -23,6 +24,20 @@ def load_datasets(cfg: DictConfig) -> tuple[MyTokenizedMidiDataset, MyTokenizedM
     else:
         translation_dataset = load_cache_dataset(dataset_cfg=cfg.dataset, dataset_name=cfg.dataset_name, split="train")
         train_translation_dataset, val_translation_dataset = translation_dataset.train_test_split(0.1).values()
+
+    # TODO: move rep and probability to config (?)
+    train_translation_dataset = augment_dataset(
+        dataset=train_translation_dataset,
+        dataset_cfg=cfg.dataset,
+        augmentation_probability=0.5,
+        augmentation_rep=1,
+    )
+    val_translation_dataset = augment_dataset(
+        dataset=val_translation_dataset,
+        dataset_cfg=cfg.dataset,
+        augmentation_probability=0.5,
+        augmentation_rep=1,
+    )
 
     train_dataset = MyTokenizedMidiDataset(
         dataset=train_translation_dataset,

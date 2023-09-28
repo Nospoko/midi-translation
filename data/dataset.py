@@ -1,10 +1,7 @@
 import json
-import time
-import random
 import hashlib
 
 import torch
-import numpy as np
 import fortepyan as ff
 from tqdm import tqdm
 from datasets import Dataset, load_dataset
@@ -13,39 +10,12 @@ from torch.utils.data import Dataset as TorchDataset
 
 from data.tokenizer import MidiEncoder
 from data.quantizer import MidiQuantizer
-from data.augmentation import pitch_shift, change_speed
-
-
-def apply_augmentation(record: dict, augmentation_probability: float):
-    augmented = record.copy()
-    notes = augmented["notes"]
-    # check if augmentation happened
-    done = False
-    # shift pitch augmentation
-    if random.random() < augmentation_probability:
-        # max shift is octave down or up
-        shift = random.randint(1, 12)
-        notes["pitch"] = pitch_shift(notes["pitch"], shift)
-        done = True
-
-    # change tempo augmentation
-    if random.random() < augmentation_probability:
-        notes = change_speed(notes)
-        done = True
-
-    augmented["notes"] = notes
-
-    # if no augmentation was done, return None
-    return augmented if done else None
 
 
 def build_translation_dataset(
     dataset: Dataset,
     dataset_cfg: DictConfig,
-    augmentation_probability: float = 0.5,
-    augmentation_rep: int = 1,
 ) -> Dataset:
-    elapsed = 0
     # ~90s for giant midi
     quantizer = MidiQuantizer(
         n_dstart_bins=dataset_cfg.quantization.dstart,
@@ -55,25 +25,12 @@ def build_translation_dataset(
 
     quantized_pieces = []
     for it, record in tqdm(enumerate(dataset), total=len(dataset)):
-        t = time.time()
-        augmented = [
-            apply_augmentation(
-                record=record,
-                augmentation_probability=augmentation_probability,
-            )
-            for _ in range(augmentation_rep)
-        ]
-        elapsed += time.time() - t
-        # append augmented records if augmentation happened and original record
-        records = [aug for aug in augmented if aug is not None] + [record]
-        for new_record in records:
-            piece = ff.MidiPiece.from_huggingface(new_record)
-            qpiece = quantizer.inject_quantization_features(piece)
+        piece = ff.MidiPiece.from_huggingface(record)
+        qpiece = quantizer.inject_quantization_features(piece)
 
-            # We want to get back to the original recording easily
-            qpiece.source |= {"base_record_id": it, "dataset_name": dataset.info.dataset_name}
-            quantized_pieces.append(qpiece)
-    print(elapsed)
+        # We want to get back to the original recording easily
+        qpiece.source |= {"base_record_id": it, "dataset_name": dataset.info.dataset_name}
+        quantized_pieces.append(qpiece)
 
     # ~20min for giant midi
     chopped_sequences = []
