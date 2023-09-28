@@ -47,13 +47,10 @@ class MultiHeadedAttention(nn.Module):
             einops.rearrange(lin(x), "b n (h d_k) -> b h n d_k", h=self.h, d_k=self.d_k)
             for lin, x in zip(self.linears, (query, key, value))
         ]
-
         # 2) Apply attention on all the projected vectors in batch.
         x, self.attn = attention(query, key, value, mask=mask, dropout=self.dropout)
 
         # 3) "Concat" and apply a final linear.
         x = einops.rearrange(x, "b h n d_k -> b n (h d_k)")
-        del query
-        del key
-        del value
+
         return self.linears[-1](x)

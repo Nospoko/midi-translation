@@ -213,23 +213,19 @@ def generate_velocities(
         dataset_cfg=train_cfg.dataset,
     )
 
-    pad_idx = src_encoder.token_to_id["<blank>"]
-
     predicted_tokens = []
     for record in tqdm(dataset):
         src_token_ids = record["source_token_ids"]
-        src_mask = (src_token_ids != pad_idx).unsqueeze(-2)
+        # TODO: src_mask is just ([True] * len(src_mask)).unsqueeze(-2) now
 
         predicted_token_ids, probabilities = decode_and_output(
             model=model,
             src=src_token_ids,
-            src_mask=src_mask[0],
             max_len=train_cfg.dataset.sequence_len,
-            start_symbol=0,
             device=train_cfg.device,
         )
 
-        out_tokens = [tgt_encoder.vocab[x] for x in predicted_token_ids if x != pad_idx]
+        out_tokens = [tgt_encoder.vocab[x] for x in predicted_token_ids]
         predicted_tokens += out_tokens
 
     pred_velocities = tgt_encoder.untokenize(predicted_tokens)

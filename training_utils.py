@@ -22,8 +22,6 @@ def train_model(
     val_dataset: MyTokenizedMidiDataset,
     cfg: DictConfig,
 ) -> nn.Module:
-    # Get the index for padding token
-    pad_idx = train_dataset.src_encoder.token_to_id["<blank>"]
     src_vocab_size, tgt_vocab_size = vocab_sizes(cfg)
 
     # define model parameters and create the model
@@ -41,7 +39,6 @@ def train_model(
     # Set LabelSmoothing as a criterion for loss calculation
     criterion = LabelSmoothing(
         size=tgt_vocab_size,
-        padding_idx=pad_idx,
         smoothing=cfg.train.label_smoothing,
     )
     criterion.to(cfg.device)
@@ -79,21 +76,18 @@ def train_model(
             lr_scheduler=lr_scheduler,
             accum_iter=cfg.train.accum_iter,
             log_frequency=cfg.log_frequency,
-            pad_idx=pad_idx,
             device=cfg.device,
         )
 
         print(f"Epoch {epoch} Validation", flush=True)
-        with torch.no_grad():
-            model.eval()
-            # Evaluate the model on validation set
-            v_loss, v_dist = val_epoch(
-                dataloader=val_dataloader,
-                model=model,
-                criterion=criterion,
-                pad_idx=pad_idx,
-                device=cfg.device,
-            )
+        model.eval()
+        # Evaluate the model on validation set
+        v_loss, v_dist = val_epoch(
+            dataloader=val_dataloader,
+            model=model,
+            criterion=criterion,
+            device=cfg.device,
+        )
 
         if v_loss <= best_test_loss:
             save_checkpoint(
@@ -113,6 +107,7 @@ def train_model(
                 "epoch": epoch,
             }
         )
+
     return model
 
 
@@ -141,7 +136,6 @@ def train_epoch(
     lr_scheduler: LambdaLR,
     accum_iter: int = 1,
     log_frequency: int = 10,
-    pad_idx: int = 2,
     device: str = "cpu",
 ) -> tuple[float, float]:
     start = time.time()
@@ -154,17 +148,17 @@ def train_epoch(
     # create progress bar
     steps = len(dataloader)
     progress_bar = tqdm(dataloader, total=steps)
+
     for batch in progress_bar:
         src = batch["source_token_ids"].to(device)
         tgt = batch["target_token_ids"].to(device)
-        batch = Batch(src=src, tgt=tgt, pad_idx=pad_idx)
+        batch = Batch(src=src, tgt=tgt)
 
         encoded_decoded = model.forward(batch.src, batch.tgt, batch.src_mask, batch.tgt_mask)
         out = model.generator(encoded_decoded)
 
         out = einops.rearrange(out, "b n d -> (b n) d")
         target = einops.rearrange(batch.tgt_y, "b n -> (b n)")
-
         loss = criterion(out, target) / batch.ntokens
         loss.backward()
 
@@ -208,7 +202,6 @@ def val_epoch(
     dataloader: Iterable,
     model: nn.Module,
     criterion: Callable,
-    pad_idx: int = 2,
     device: str = "cpu",
 ) -> tuple[float, float]:
     total_tokens = 0
@@ -219,7 +212,7 @@ def val_epoch(
     for batch in tqdm(dataloader):
         src = batch["source_token_ids"].to(device)
         tgt = batch["target_token_ids"].to(device)
-        batch = Batch(src=src, tgt=tgt, pad_idx=pad_idx)
+        batch = Batch(src=src, tgt=tgt)
 
         encoded_decoded = model.forward(batch.src, batch.tgt, batch.src_mask, batch.tgt_mask)
         out = model.generator(encoded_decoded)

@@ -46,12 +46,9 @@ def predict_piece_dashboard(
         dataset_cfg=train_cfg.dataset,
     )
 
-    pad_idx = src_encoder.token_to_id["<blank>"]
-
     _, tgt_vocab_size = vocab_sizes(train_cfg)
     criterion = LabelSmoothing(
         size=tgt_vocab_size,
-        padding_idx=pad_idx,
         smoothing=train_cfg.train.label_smoothing,
     )
     criterion.to(train_cfg.device)
@@ -63,22 +60,20 @@ def predict_piece_dashboard(
     for record in tqdm(dataset):
         src_token_ids = record["source_token_ids"]
         tgt_token_ids = record["target_token_ids"]
-        src_mask = (src_token_ids != pad_idx).unsqueeze(-2)
 
         predicted_token_ids, probabilities = decode_and_output(
             model=model,
             src=src_token_ids,
-            src_mask=src_mask[0],
             max_len=train_cfg.dataset.sequence_len,
-            start_symbol=0,
             device=train_cfg.device,
         )
 
-        out_tokens = [tgt_encoder.vocab[x] for x in predicted_token_ids if x != pad_idx]
+        out_tokens = [tgt_encoder.vocab[x] for x in predicted_token_ids]
         predicted_tokens += out_tokens
 
-        target = tgt_token_ids[1:-1].to(train_cfg.device)
-        n_tokens = (target != pad_idx).data.sum()
+        target = tgt_token_ids[1:].to(train_cfg.device)
+        n_tokens = target.numel()
+
         loss = criterion(probabilities, target) / n_tokens
         total_loss += loss.item()
         total_dist += calculate_average_distance(probabilities, target).cpu()
