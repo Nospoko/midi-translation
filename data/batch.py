@@ -23,7 +23,7 @@ class Batch:
         self.tgt_y = tgt[:, 1:]
         self.tgt_mask = self.make_std_mask(self.tgt)
         # count tokens
-        self.ntokens = (self.tgt_y != -1).data.sum()
+        self.ntokens = self.tgt_y.numel()
 
     def __rich_repr__(self):
         yield "Batch"

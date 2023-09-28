@@ -117,8 +117,8 @@ def greedy_decode(
     for _ in range(max_len):
         sub_mask = subsequent_mask(sentence.size(1)).type_as(src.data).to(dev)
         out = model.decode(memory, src_mask, sentence, sub_mask)
-
         prob = model.generator(out[:, -1])
+
         next_word = prob.argmax(dim=1)
         next_word = next_word.data[0]
 
@@ -147,6 +147,7 @@ def decode_and_output(
         sub_mask = subsequent_mask(sentence.size(1)).type_as(src.data).to(dev)
         out = model.decode(memory, src_mask, sentence, sub_mask)
         prob = model.generator(out[:, -1])
+
         next_word = prob.argmax(dim=1)
         next_word = next_word.data[0]
 

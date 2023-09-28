@@ -80,15 +80,14 @@ def train_model(
         )
 
         print(f"Epoch {epoch} Validation", flush=True)
-        with torch.no_grad():
-            model.eval()
-            # Evaluate the model on validation set
-            v_loss, v_dist = val_epoch(
-                dataloader=val_dataloader,
-                model=model,
-                criterion=criterion,
-                device=cfg.device,
-            )
+        model.eval()
+        # Evaluate the model on validation set
+        v_loss, v_dist = val_epoch(
+            dataloader=val_dataloader,
+            model=model,
+            criterion=criterion,
+            device=cfg.device,
+        )
 
         if v_loss <= best_test_loss:
             save_checkpoint(
@@ -108,6 +107,7 @@ def train_model(
                 "epoch": epoch,
             }
         )
+
     return model
 
 
@@ -148,6 +148,7 @@ def train_epoch(
     # create progress bar
     steps = len(dataloader)
     progress_bar = tqdm(dataloader, total=steps)
+
     for batch in progress_bar:
         src = batch["source_token_ids"].to(device)
         tgt = batch["target_token_ids"].to(device)

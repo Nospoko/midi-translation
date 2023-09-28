@@ -43,7 +43,7 @@ def main(cfg: DictConfig, model: nn.Module, translation_dataset: Dataset, device
         )
 
         target = tgt[1:].to(device)
-        n_tokens = (target != -1).data.sum()
+        n_tokens = target.numel()
 
         loss = criterion(out, target) / n_tokens
         total_loss += loss.item()

@@ -73,8 +73,8 @@ def predict_piece_dashboard(
         predicted_tokens += out_tokens
 
         target = tgt_token_ids[1:].to(train_cfg.device)
-        # minimal change to count tokens without padding idx
-        n_tokens = (target != -1).data.sum()
+        n_tokens = target.numel()
+
         loss = criterion(probabilities, target) / n_tokens
         total_loss += loss.item()
         total_dist += calculate_average_distance(probabilities, target).cpu()

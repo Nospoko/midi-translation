@@ -22,7 +22,7 @@ class LayerNorm(nn.Module):
 class SublayerConnection(nn.Module):
     """
     A residual connection followed by a layer norm.
-    Note for code simplicity the norm is first as opposed to last.
+    Note: for code simplicity the norm is first as opposed to last.
     """
 
     def __init__(self, size: int, dropout: float):
