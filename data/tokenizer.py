@@ -64,7 +64,7 @@ class QuantizedMidiEncoder(MidiEncoder):
             self.vocab.append(key)
 
     def tokenize(self, record: dict) -> list[str]:
-        tokens = ["<CLS>"]
+        tokens = []
         n_samples = len(record[self.keys[0]])
         for idx in range(n_samples):
             token = "-".join([f"{record[key][idx]:0.0f}" for key in self.keys])
@@ -110,7 +110,7 @@ class VelocityEncoder(MidiEncoder):
         self.vocab += [str(possible_velocity) for possible_velocity in range(128)]
 
     def tokenize(self, record: dict) -> list[str]:
-        tokens = ["<CLS>"] + [str(velocity) for velocity in record["velocity"]]
+        tokens = [str(velocity) for velocity in record["velocity"]]
         return tokens
 
     def untokenize(self, tokens: list[str]) -> list[int]:
@@ -177,7 +177,7 @@ class DstartEncoder(MidiEncoder):
         dstart_bins = self.quantize(record["start"])
 
         # get tokens from quantized data
-        tokens = ["<CLS>"] + [str(dstart_bin) for dstart_bin in dstart_bins]
+        tokens = [str(dstart_bin) for dstart_bin in dstart_bins]
         return tokens
 
     def untokenize(self, tokens: list[str]) -> list[int]:

@@ -100,6 +100,8 @@ class MyTokenizedMidiDataset(TorchDataset):
         source_tokens_ids = self.src_encoder.encode(record)
         target_tokens_ids = self.tgt_encoder.encode(record)
 
+        source_tokens_ids, target_tokens_ids = self.add_cls_token(source_tokens_ids, target_tokens_ids)
+
         out = {
             "source_token_ids": torch.tensor(source_tokens_ids, dtype=torch.int64),
             "target_token_ids": torch.tensor(target_tokens_ids, dtype=torch.int64),
@@ -110,6 +112,13 @@ class MyTokenizedMidiDataset(TorchDataset):
         # The usual token ids + everything we store
         out = self[idx] | self.dataset[idx]
         return out
+
+    def add_cls_token(self, src_token_ids: list[int], tgt_token_ids: list[int]):
+        cls_token_id = self.tgt_encoder.token_to_id["<CLS>"]
+        src_token_ids.insert(0, cls_token_id)
+        tgt_token_ids.insert(0, cls_token_id)
+        
+        return src_token_ids, tgt_token_ids
 
 
 def load_cache_dataset(
