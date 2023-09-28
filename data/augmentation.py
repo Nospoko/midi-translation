@@ -6,6 +6,13 @@ from omegaconf import DictConfig
 
 from data.quantizer import MidiQuantizer
 
+import numpy as np
+from tqdm import tqdm
+from datasets import Dataset
+from omegaconf import DictConfig
+
+from data.quantizer import MidiQuantizer
+
 
 def change_speed(record: dict, factor: float = None) -> dict:
     if not factor:
