@@ -4,6 +4,7 @@ import random
 import hashlib
 
 import torch
+import numpy as np
 import fortepyan as ff
 from tqdm import tqdm
 from datasets import Dataset, load_dataset
@@ -73,6 +74,7 @@ def build_translation_dataset(
             qpiece.source |= {"base_record_id": it, "dataset_name": dataset.info.dataset_name}
             quantized_pieces.append(qpiece)
     print(elapsed)
+
     # ~20min for giant midi
     chopped_sequences = []
     for it, piece in tqdm(enumerate(quantized_pieces), total=len(quantized_pieces)):
@@ -89,23 +91,24 @@ def build_translation_dataset(
 def quantized_piece_to_records(piece: ff.MidiPiece, sequence_len: int, sequence_step: int):
     chopped_sequences = []
     n_samples = 1 + (piece.size - sequence_len) // sequence_step
+    df = piece.df
     for jt in range(n_samples):
         start = jt * sequence_step
         finish = start + sequence_len
-        part = piece[start:finish]
+        part = df.iloc[start:finish]
 
         sequence = {
-            "pitch": part.df.pitch.astype("int16").values.T,
+            "pitch": part.pitch.astype("int16").values.T,
             # Quantized features
-            "dstart_bin": part.df.dstart_bin.astype("int16").values.T,
-            "duration_bin": part.df.duration_bin.astype("int16").values.T,
-            "velocity_bin": part.df.velocity_bin.astype("int16").values.T,
+            "dstart_bin": part.dstart_bin.astype("int16").values.T,
+            "duration_bin": part.duration_bin.astype("int16").values.T,
+            "velocity_bin": part.velocity_bin.astype("int16").values.T,
             # Ground truth
-            "start": part.df.start.values,
-            "end": part.df.end.values,
-            "duration": part.df.duration.values,
-            "velocity": part.df.velocity.values,
-            "source": json.dumps(part.source),
+            "start": part.start.values,
+            "end": part.end.values,
+            "duration": part.duration.values,
+            "velocity": part.velocity.values,
+            "source": json.dumps(piece.source),
         }
         chopped_sequences.append(sequence)
 
