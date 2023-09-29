@@ -130,6 +130,7 @@ def load_cache_dataset(
     dataset_name: str,
     split: str,
     force_build: bool = False,
+    cache_dataset: bool = False,
 ) -> Dataset:
     # Prepare caching hash
     config_hash = hashlib.sha256()
@@ -155,6 +156,7 @@ def load_cache_dataset(
         dataset=midi_dataset,
         dataset_cfg=dataset_cfg,
     )
-    translation_dataset.save_to_disk(dataset_cache_path)
+    if cache_dataset:
+        translation_dataset.save_to_disk(dataset_cache_path)
 
     return translation_dataset

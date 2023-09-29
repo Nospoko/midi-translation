@@ -11,6 +11,7 @@ target: dstart
 dstart_bins: 200
 augmentation_probability: 0.2
 augmentation_rep: 0
+cache_dataset: True
 
 dataset:
   sequence_len: 128

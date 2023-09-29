@@ -15,14 +15,21 @@ def load_datasets(cfg: DictConfig) -> tuple[MyTokenizedMidiDataset, MyTokenizedM
             dataset_cfg=cfg.dataset,
             dataset_name=cfg.dataset_name,
             split="train",
+            cache_dataset=cfg.cache_dataset,
         )
         val_translation_dataset = load_cache_dataset(
             dataset_cfg=cfg.dataset,
             dataset_name=cfg.dataset_name,
             split="validation",
+            cache_dataset=cfg.cache_dataset,
         )
     else:
-        translation_dataset = load_cache_dataset(dataset_cfg=cfg.dataset, dataset_name=cfg.dataset_name, split="train")
+        translation_dataset = load_cache_dataset(
+            dataset_cfg=cfg.dataset,
+            dataset_name=cfg.dataset_name,
+            split="train",
+            cache_dataset=cfg.cache_dataset,
+        )
         train_translation_dataset, val_translation_dataset = translation_dataset.train_test_split(0.1).values()
 
     if cfg.augmentation_rep > 0:
