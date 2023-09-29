@@ -1,5 +1,5 @@
-import glob
 import os
+import glob
 import json
 import hashlib
 
@@ -148,7 +148,7 @@ def shard_and_build(
     processed_dataset = concatenate_datasets([Dataset.load_from_disk(path) for path in shard_paths])
     for path in shard_paths:
         for file in glob.glob(path):
-            os.rmdir(file)
+            os.remove(file)
 
     return processed_dataset
 
