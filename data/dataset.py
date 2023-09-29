@@ -146,10 +146,6 @@ def shard_and_build(
         shard_paths.append(path)
 
     processed_dataset = concatenate_datasets([Dataset.load_from_disk(path) for path in shard_paths])
-    for path in shard_paths:
-        for file in glob.glob(f"{path}/*"):
-            os.remove(file)
-        os.rmdir(path)
 
     return processed_dataset
 
