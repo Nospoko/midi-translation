@@ -69,9 +69,15 @@ def apply_augmentation(record: dict, quantizer: MidiQuantizer, augmentation_prob
 def augment_dataset(
     dataset: Dataset,
     dataset_cfg: DictConfig,
-    augmentation_probability: float = 0.5,
-    augmentation_rep: int = 1,
+    augmentation_probability: float = 0.2,
+    augmentation_rep: int = 0,
 ):
+    """
+    Augment the dataset.
+    Creates new dataset with original records and random augmentations.
+
+    If no augmentation_rep is specified, will output a copy of the dataset.
+    """
     quantizer = MidiQuantizer(
         n_dstart_bins=dataset_cfg.quantization.dstart,
         n_duration_bins=dataset_cfg.quantization.duration,
