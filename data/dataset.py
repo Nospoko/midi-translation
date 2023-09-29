@@ -1,3 +1,4 @@
+import glob
 import os
 import json
 import hashlib
@@ -33,7 +34,7 @@ def build_translation_dataset(
         qpiece.source |= {"base_record_id": it, "dataset_name": dataset.info.dataset_name}
         quantized_pieces.append(qpiece)
 
-    # ~20min for giant midi
+    # ~10min for giant midi
     chopped_sequences = []
     for it, piece in tqdm(enumerate(quantized_pieces), total=len(quantized_pieces)):
         chopped_sequences += quantized_piece_to_records(
@@ -146,7 +147,9 @@ def shard_and_build(
 
     processed_dataset = concatenate_datasets([Dataset.load_from_disk(path) for path in shard_paths])
     for path in shard_paths:
-        os.rmdir(path)
+        for file in glob.glob(path):
+            os.rmdir(file)
+
     return processed_dataset
 
 
