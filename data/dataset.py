@@ -1,12 +1,13 @@
+import os
 import json
 import hashlib
 
 import torch
 import fortepyan as ff
 from tqdm import tqdm
-from datasets import Dataset, load_dataset
 from omegaconf import OmegaConf, DictConfig
 from torch.utils.data import Dataset as TorchDataset
+from datasets import Dataset, load_dataset, concatenate_datasets
 
 from data.tokenizer import MidiEncoder
 from data.quantizer import MidiQuantizer
@@ -71,7 +72,6 @@ def quantized_piece_to_records(piece: ff.MidiPiece, sequence_len: int, sequence_
             "source": json.dumps(source),
         }
         chopped_sequences.append(sequence)
-
     return chopped_sequences
 
 
@@ -125,6 +125,31 @@ class MyTokenizedMidiDataset(TorchDataset):
         return src_token_ids, tgt_token_ids
 
 
+def shard_and_build(
+    dataset: Dataset,
+    dataset_name: str,
+    dataset_cfg: DictConfig,
+    dataset_cache_path: str,
+    num_shards: int = 2,
+) -> Dataset:
+    shard_paths = []
+    for shard_i in range(num_shards):
+        path = dataset_cache_path + f"-part-{shard_i}"
+        dataset_shard = dataset.shard(num_shards=num_shards, index=shard_i)
+        print(f"Processing shard {shard_i + 1} of {num_shards} with {len(dataset_shard)} records.")
+        # make sure dataset.info contains dataset_name - giant-midi-sustain appears to do not
+        dataset_shard.info.dataset_name = dataset_name
+
+        processed_shard = build_translation_dataset(dataset_shard, dataset_cfg=dataset_cfg)
+        processed_shard.save_to_disk(path)
+        shard_paths.append(path)
+
+    processed_dataset = concatenate_datasets([Dataset.load_from_disk(path) for path in shard_paths])
+    for path in shard_paths:
+        os.rmdir(path)
+    return processed_dataset
+
+
 def load_cache_dataset(
     dataset_cfg: DictConfig,
     dataset_name: str,
@@ -150,12 +175,16 @@ def load_cache_dataset(
     print("Building translation dataset from", dataset_name, split)
     midi_dataset = load_dataset(dataset_name, split=split)
 
-    # make sure dataset.info contains dataset_name - giant-midi-sustain appears to do not
-    midi_dataset.info.dataset_name = dataset_name
-    translation_dataset = build_translation_dataset(
+    # hardcoded maximum shard size as 5000
+    num_shards = len(midi_dataset) // 5000 + 1
+    translation_dataset = shard_and_build(
         dataset=midi_dataset,
+        dataset_name=dataset_name,
         dataset_cfg=dataset_cfg,
+        num_shards=num_shards,
+        dataset_cache_path=dataset_cache_path,
     )
+
     if cache_dataset:
         translation_dataset.save_to_disk(dataset_cache_path)
 
