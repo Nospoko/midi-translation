@@ -54,6 +54,9 @@ def quantized_piece_to_records(piece: ff.MidiPiece, sequence_len: int, sequence_
         finish = start + sequence_len
         part = df.iloc[start:finish]
 
+        source = piece.source.copy()
+        source |= {"start": start, "finish": finish}
+
         sequence = {
             "pitch": part.pitch.astype("int16").values.T,
             # Quantized features
@@ -65,7 +68,7 @@ def quantized_piece_to_records(piece: ff.MidiPiece, sequence_len: int, sequence_
             "end": part.end.values,
             "duration": part.duration.values,
             "velocity": part.velocity.values,
-            "source": json.dumps(piece.source),
+            "source": json.dumps(source),
         }
         chopped_sequences.append(sequence)
 
