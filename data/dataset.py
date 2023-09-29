@@ -135,7 +135,7 @@ def shard_and_build(
 ) -> Dataset:
     shard_paths = []
     for shard_i in range(num_shards):
-        path = dataset_cache_path + f"-part-{shard_i}"
+        path = f"{dataset_cache_path}-part-{shard_i}"
         dataset_shard = dataset.shard(num_shards=num_shards, index=shard_i)
         print(f"Processing shard {shard_i + 1} of {num_shards} with {len(dataset_shard)} records.")
         # make sure dataset.info contains dataset_name - giant-midi-sustain appears to do not
@@ -147,8 +147,9 @@ def shard_and_build(
 
     processed_dataset = concatenate_datasets([Dataset.load_from_disk(path) for path in shard_paths])
     for path in shard_paths:
-        for file in glob.glob(path):
+        for file in glob.glob(f"{path}/*"):
             os.remove(file)
+        os.rmdir(path)
 
     return processed_dataset
 
