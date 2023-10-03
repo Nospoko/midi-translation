@@ -3,6 +3,7 @@ import glob
 import json
 import hashlib
 
+import datasets
 import torch
 import fortepyan as ff
 from tqdm import tqdm
@@ -31,7 +32,7 @@ def build_translation_dataset(
         qpiece = quantizer.inject_quantization_features(piece)
 
         # We want to get back to the original recording easily
-        qpiece.source |= {"base_record_id": it, "dataset_name": dataset.info.splits["train"].dataset_name}
+        qpiece.source |= {"base_record_id": it, "dataset_name": dataset.info.description}
         quantized_pieces.append(qpiece)
 
     # ~10min for giant midi
@@ -155,13 +156,11 @@ def shard_and_build(
 def load_cache_dataset(
     dataset_cfg: DictConfig,
     dataset_name: str,
-    split: str,
     force_build: bool = False,
-    cache_dataset: bool = False,
 ) -> Dataset:
     # Prepare caching hash
     config_hash = hashlib.sha256()
-    config_string = json.dumps(OmegaConf.to_container(dataset_cfg)) + split + dataset_name
+    config_string = json.dumps(OmegaConf.to_container(dataset_cfg)) + dataset_name
     config_hash.update(config_string.encode())
     config_hash = config_hash.hexdigest()
 
@@ -174,10 +173,13 @@ def load_cache_dataset(
         except Exception as e:
             print("Failed loading cached dataset:", e)
 
-    print("Building translation dataset from", dataset_name, split)
-    midi_dataset = load_dataset(dataset_name, split=split)
-    # make sure dataset.info.splits contains correct dataset_name - at least on train
-    midi_dataset.info.splits["train"].dataset_name = dataset_name
+    print("Building translation dataset from", dataset_name)
+    midi_dataset = load_dataset(dataset_name)
+    # make dataset split-agnostic
+    midi_dataset = concatenate_datasets([midi_dataset[key] for key in midi_dataset.keys()])
+
+    # using description to store dataset_name allows sharding to work properly
+    midi_dataset.info.description = dataset_name
 
     # hardcoded maximum shard size as 5000
     num_shards = len(midi_dataset) // 5000 + 1

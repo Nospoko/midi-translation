@@ -10,7 +10,6 @@ dataset_name: 'roszcz/maestro-v1-sustain'
 target: velocity
 augmentation_probability: 0.2
 augmentation_rep: 0
-cache_dataset: True
 
 dataset:
   sequence_len: 128
