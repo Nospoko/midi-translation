@@ -28,12 +28,11 @@ def load_datasets(cfg: DictConfig) -> tuple[MyTokenizedMidiDataset, MyTokenizedM
         split="test+validation",
     )
 
-    if cfg.augmentation_rep > 0:
+    if cfg.augmentation.repetitions > 0:
         train_translation_dataset = augment_dataset(
             dataset=train_translation_dataset,
             dataset_cfg=cfg.dataset,
-            augmentation_probability=cfg.augmentation_probability,
-            augmentation_rep=cfg.augmentation_rep,
+            augmentation_cfg=cfg.augmentation,
         )
 
     train_dataset = MyTokenizedMidiDataset(
