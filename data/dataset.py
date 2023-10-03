@@ -31,7 +31,7 @@ def build_translation_dataset(
         qpiece = quantizer.inject_quantization_features(piece)
 
         # We want to get back to the original recording easily
-        qpiece.source |= {"base_record_id": it, "dataset_name": dataset.info.dataset_name}
+        qpiece.source |= {"base_record_id": it, "dataset_name": dataset.info.splits["train"].dataset_name}
         quantized_pieces.append(qpiece)
 
     # ~10min for giant midi
@@ -128,24 +128,26 @@ class MyTokenizedMidiDataset(TorchDataset):
 
 def shard_and_build(
     dataset: Dataset,
-    dataset_name: str,
     dataset_cfg: DictConfig,
     dataset_cache_path: str,
     num_shards: int = 2,
 ) -> Dataset:
     shard_paths = []
-    for shard_i in range(num_shards):
-        path = f"{dataset_cache_path}-part-{shard_i}"
-        dataset_shard = dataset.shard(num_shards=num_shards, index=shard_i)
-        print(f"Processing shard {shard_i + 1} of {num_shards} with {len(dataset_shard)} records.")
-        # make sure dataset.info contains dataset_name - giant-midi-sustain appears to do not
-        dataset_shard.info.dataset_name = dataset_name
+    for it in range(num_shards):
+        path = f"{dataset_cache_path}-part-{it}"
+        dataset_shard = dataset.shard(num_shards=num_shards, index=it)
+        print(f"Processing shard {it} of {num_shards} with {len(dataset_shard)} records.")
 
         processed_shard = build_translation_dataset(dataset_shard, dataset_cfg=dataset_cfg)
         processed_shard.save_to_disk(path)
         shard_paths.append(path)
 
     processed_dataset = concatenate_datasets([Dataset.load_from_disk(path) for path in shard_paths])
+
+    for path in shard_paths:
+        for file in glob.glob(f"{path}/*"):
+            os.remove(file)
+        os.rmdir(path)
 
     return processed_dataset
 
@@ -174,18 +176,20 @@ def load_cache_dataset(
 
     print("Building translation dataset from", dataset_name, split)
     midi_dataset = load_dataset(dataset_name, split=split)
+    # make sure dataset.info.splits contains correct dataset_name - at least on train
+    midi_dataset.info.splits["train"].dataset_name = dataset_name
 
     # hardcoded maximum shard size as 5000
     num_shards = len(midi_dataset) // 5000 + 1
     translation_dataset = shard_and_build(
         dataset=midi_dataset,
-        dataset_name=dataset_name,
         dataset_cfg=dataset_cfg,
         num_shards=num_shards,
         dataset_cache_path=dataset_cache_path,
     )
 
-    if cache_dataset:
-        translation_dataset.save_to_disk(dataset_cache_path)
+    translation_dataset.save_to_disk(dataset_cache_path)
+    # load dataset again to update cache_files attribute
+    translation_dataset = Dataset.load_from_disk(dataset_cache_path)
 
     return translation_dataset
