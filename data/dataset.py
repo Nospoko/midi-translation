@@ -3,7 +3,6 @@ import glob
 import json
 import hashlib
 
-import datasets
 import torch
 import fortepyan as ff
 from tqdm import tqdm
@@ -27,6 +26,7 @@ def build_translation_dataset(
     )
 
     quantized_pieces = []
+
     for it, record in tqdm(enumerate(dataset), total=len(dataset)):
         piece = ff.MidiPiece.from_huggingface(record)
         qpiece = quantizer.inject_quantization_features(piece)
@@ -134,8 +134,10 @@ def shard_and_build(
     num_shards: int = 2,
 ) -> Dataset:
     shard_paths = []
+
     for it in range(num_shards):
         path = f"{dataset_cache_path}-part-{it}"
+
         dataset_shard = dataset.shard(num_shards=num_shards, index=it)
         print(f"Processing shard {it} of {num_shards} with {len(dataset_shard)} records.")
 
@@ -156,6 +158,7 @@ def shard_and_build(
 def load_cache_dataset(
     dataset_cfg: DictConfig,
     dataset_name: str,
+    split: str = "train",
     force_build: bool = False,
 ) -> Dataset:
     # Prepare caching hash
@@ -173,10 +176,8 @@ def load_cache_dataset(
         except Exception as e:
             print("Failed loading cached dataset:", e)
 
-    print("Building translation dataset from", dataset_name)
-    midi_dataset = load_dataset(dataset_name)
-    # make dataset split-agnostic
-    midi_dataset = concatenate_datasets([midi_dataset[key] for key in midi_dataset.keys()])
+    print("Building translation dataset from", dataset_name, split)
+    midi_dataset = load_dataset(dataset_name, split=split)
 
     # using description to store dataset_name allows sharding to work properly
     midi_dataset.info.description = dataset_name
