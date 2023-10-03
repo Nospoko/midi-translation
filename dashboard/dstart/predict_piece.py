@@ -4,46 +4,39 @@ import torch
 import torch.nn as nn
 import streamlit as st
 from tqdm import tqdm
+from datasets import Dataset
 from fortepyan import MidiPiece
 from omegaconf import DictConfig
-from datasets import Dataset, load_dataset
 
 from data.quantizer import MidiQuantizer
-from dashboard.components import download_button
 from modules.label_smoothing import LabelSmoothing
-from data.tokenizer import VelocityEncoder, QuantizedMidiEncoder
+from data.tokenizer import DstartEncoder, QuantizedMidiEncoder
+from dashboard.components import piece_selector, download_button
 from data.dataset import MyTokenizedMidiDataset, quantized_piece_to_records
 from utils import vocab_sizes, piece_av_files, decode_and_output, calculate_average_distance
 
 
 @torch.no_grad()
-def predict_piece_dashboard(model: nn.Module, train_cfg: DictConfig):
-    # Prepare everythin required to make inference
-    quantizer = MidiQuantizer(
-        n_dstart_bins=train_cfg.dataset.quantization.dstart,
-        n_duration_bins=train_cfg.dataset.quantization.duration,
-        n_velocity_bins=train_cfg.dataset.quantization.velocity,
-    )
+def predict_piece_dashboard(
+    model: nn.Module,
+    quantizer: MidiQuantizer,
+    train_cfg: DictConfig,
+    model_dir: str,
+):
+    # Prepare everything required to make inference
     src_encoder = QuantizedMidiEncoder(train_cfg.dataset.quantization)
-    tgt_encoder = VelocityEncoder()
+    tgt_encoder = DstartEncoder(n_bins=train_cfg.dstart_bins)
 
-    dataset_name = st.text_input(label="dataset", value=train_cfg.dataset_name)
-    split = st.text_input(label="split", value="test")
-    record_id = st.number_input(label="record id", value=0)
-    hf_dataset = load_dataset(dataset_name, split=split)
-
-    # Select one full piece
-    record = hf_dataset[record_id]
-    piece = MidiPiece.from_huggingface(record)
-    # Crazy experiment
-    # piece.df.velocity = np.random.randint(128, size=piece.size)
+    piece, piece_descriptor = piece_selector(dataset_name=train_cfg.dataset_name)
 
     # And run full pre-processing ...
     qpiece = quantizer.inject_quantization_features(piece)
+
+    # hard coded (idk if it needs changing)
     sequences = quantized_piece_to_records(
         piece=qpiece,
-        sequence_len=train_cfg.dataset.sequence_len,
-        sequence_step=train_cfg.dataset.sequence_len,
+        sequence_len=128,
+        sequence_step=128,
     )
     one_record_dataset = Dataset.from_list(sequences)
 
@@ -55,49 +48,44 @@ def predict_piece_dashboard(model: nn.Module, train_cfg: DictConfig):
         dataset_cfg=train_cfg.dataset,
     )
 
-    pad_idx = src_encoder.token_to_id["<blank>"]
-
     _, tgt_vocab_size = vocab_sizes(train_cfg)
     criterion = LabelSmoothing(
         size=tgt_vocab_size,
-        padding_idx=pad_idx,
         smoothing=train_cfg.train.label_smoothing,
     )
     criterion.to(train_cfg.device)
 
     total_loss = 0
     total_dist = 0
-
     predicted_tokens = []
     for record in tqdm(dataset):
         src_token_ids = record["source_token_ids"]
         tgt_token_ids = record["target_token_ids"]
-        src_mask = (src_token_ids != pad_idx).unsqueeze(-2)
 
         predicted_token_ids, probabilities = decode_and_output(
             model=model,
             src=src_token_ids,
-            src_mask=src_mask[0],
-            max_len=train_cfg.dataset.sequence_len,
-            start_symbol=0,
+            max_len=128,
             device=train_cfg.device,
         )
 
-        out_tokens = [tgt_encoder.vocab[x] for x in predicted_token_ids if x != pad_idx]
+        out_tokens = [tgt_encoder.vocab[x] for x in predicted_token_ids]
         predicted_tokens += out_tokens
 
-        target = tgt_token_ids[1:-1].to(train_cfg.device)
-        n_tokens = (target != pad_idx).data.sum()
+        target = tgt_token_ids[1:].to(train_cfg.device)
+        n_tokens = target.numel()
+
         loss = criterion(probabilities, target) / n_tokens
         total_loss += loss.item()
         total_dist += calculate_average_distance(probabilities, target).cpu()
 
-    pred_velocities = tgt_encoder.untokenize(predicted_tokens)
+    predictions = tgt_encoder.untokenize(predicted_tokens)
 
     predicted_piece_df = piece.df.copy()
-    predicted_piece_df = predicted_piece_df.head(len(pred_velocities))
+    predicted_piece_df = predicted_piece_df.head(len(predictions))
 
-    predicted_piece_df["velocity"] = pred_velocities.fillna(0)
+    predicted_piece_df["start"] = tgt_encoder.unquantized_start(predictions)
+    predicted_piece_df["end"] = predicted_piece_df["start"] + predicted_piece_df["duration"]
     predicted_piece = MidiPiece(predicted_piece_df)
 
     predicted_piece.source = piece.source.copy()
@@ -109,12 +97,7 @@ def predict_piece_dashboard(model: nn.Module, train_cfg: DictConfig):
 
     print(f"{avg_loss:6.2f}, {avg_dist:6.2f}")
 
-    # Render audio and video
-    model_dir = f"tmp/dashboard/{train_cfg.run_name}"
-    if not os.path.exists(model_dir):
-        os.mkdir(model_dir)
-
-    save_base_pred = f"{dataset_name}-{split}-{record_id}-{train_cfg.run_name}".replace("/", "_")
+    save_base_pred = f"{piece_descriptor}-{train_cfg.run_name}".replace("/", "_")
     save_base_pred = os.path.join(model_dir, save_base_pred)
     pred_paths = piece_av_files(predicted_piece, save_base=save_base_pred)
 

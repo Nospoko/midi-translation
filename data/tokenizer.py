@@ -1,5 +1,6 @@
 import itertools
 
+import yaml
 import numpy as np
 import pandas as pd
 from uaclient import yaml
@@ -31,13 +32,14 @@ class MidiEncoder:
 
 class QuantizedMidiEncoder(MidiEncoder):
     def __init__(self, quantization_cfg: DictConfig):
+        super().__init__()
         self.quantization_cfg = quantization_cfg
         self.keys = ["pitch", "dstart_bin", "duration_bin", "velocity_bin"]
-        self.specials = ["<s>", "</s>", "<blank>"]
-        # Make a copy of special tokens ...
+        self.specials = ["<CLS>"]
+
         self.vocab = list(self.specials)
 
-        # ... and add midi tokens
+        # add midi tokens to vocab
         self._build_vocab()
         self.token_to_id = {token: it for it, token in enumerate(self.vocab)}
 
@@ -63,16 +65,12 @@ class QuantizedMidiEncoder(MidiEncoder):
             self.vocab.append(key)
 
     def tokenize(self, record: dict) -> list[str]:
-        # TODO I don't love the idea of adding tokens durint *tokenize* call
-        # If we want to pretend that our midi sequences have start and finish
-        # we should take care of that before we get here :alarm:
-        tokens = ["<s>"]
+        tokens = []
         n_samples = len(record[self.keys[0]])
         for idx in range(n_samples):
             token = "-".join([f"{record[key][idx]:0.0f}" for key in self.keys])
             tokens.append(token)
 
-        tokens.append("</s>")
         return tokens
 
     def untokenize(self, tokens: list[str]) -> pd.DataFrame:
@@ -92,13 +90,12 @@ class QuantizedMidiEncoder(MidiEncoder):
 
 class VelocityEncoder(MidiEncoder):
     def __init__(self):
+        super().__init__()
         self.key = "velocity"
-        self.specials = ["<s>", "</s>", "<blank>"]
-
-        # Make a copy of special tokens ...
+        self.specials = ["<CLS>"]
         self.vocab = list(self.specials)
 
-        # ... and add velocity tokens
+        # add velocity tokens
         self._build_vocab()
         self.token_to_id = {token: it for it, token in enumerate(self.vocab)}
 
@@ -114,32 +111,30 @@ class VelocityEncoder(MidiEncoder):
         self.vocab += [str(possible_velocity) for possible_velocity in range(128)]
 
     def tokenize(self, record: dict) -> list[str]:
-        # TODO I don't love the idea of adding tokens durint *tokenize* call
-        # If we want to pretend that our midi sequences have start and finish
-        # we should take care of that before we get here :alarm:
-        velocity_tokens = [str(velocity) for velocity in record["velocity"]]
-        tokens = ["<s>"] + velocity_tokens + ["</s>"]
+        tokens = [str(velocity) for velocity in record["velocity"]]
         return tokens
 
-    def untokenize(self, tokens: list[str]) -> pd.DataFrame:
+    def untokenize(self, tokens: list[str]) -> list[int]:
         velocities = [int(token) for token in tokens if token not in self.specials]
-        df = pd.DataFrame(velocities, columns=["velocity"])
 
-        return df
+        return velocities
 
 
 class DstartEncoder(MidiEncoder):
-    def __init__(self, bins: int = 200):
-        self.specials = ["<s>", "</s>", "<blank>"]
-        self.bins = bins
-        # Make a copy of special tokens ...
+    def __init__(self, n_bins: int = 200):
+        super().__init__()
+        self.specials = ["<CLS>"]
+        self.bins = n_bins
+
         self.vocab = list(self.specials)
-        self.bin_edges = self.load_bin_edges()
-        # ... and add velocity tokens
+        # add dstart tokens
         self._build_vocab()
+        self._bin_edges = self._load_bin_edges()
+        self.bin_to_dstart = []
+        self._build_dstart_decoder()
         self.token_to_id = {token: it for it, token in enumerate(self.vocab)}
 
-    def load_bin_edges(self):
+    def _load_bin_edges(self):
         artifacts_path = to_absolute_path("artifacts/bin_edges.yaml")
         with open(artifacts_path, "r") as f:
             bin_edges = yaml.safe_load(f)
@@ -150,30 +145,43 @@ class DstartEncoder(MidiEncoder):
     def _build_vocab(self):
         self.vocab += [str(possible_bin) for possible_bin in range(self.bins)]
 
+    def _build_dstart_decoder(self):
+        self.bin_to_dstart = []
+        for it in range(1, len(self._bin_edges)):
+            dstart = (self._bin_edges[it - 1] + self._bin_edges[it]) / 2
+            self.bin_to_dstart.append(dstart)
+
+        last_dstart = 2 * self._bin_edges[-1]
+        self.bin_to_dstart.append(last_dstart)
+
     @property
     def vocab_size(self) -> int:
         return len(self.vocab)
 
+    def unquantized_start(self, dstart_bins: np.array) -> np.array:
+        quant_dstart = [self.bin_to_dstart[it] for it in dstart_bins]
+        start = pd.Series(quant_dstart).cumsum().shift(1).fillna(0)
+
+        return start
+
+    def quantize(self, start: list[float]) -> list[int]:
+        dstart = []
+        for it in range(len(start) - 1):
+            dstart.append(start[it + 1] - start[it])
+        dstart.append(0)
+
+        dstart_bins = np.digitize(dstart, self._bin_edges) - 1
+
+        return dstart_bins
+
     def tokenize(self, record: dict) -> list[str]:
-        # TODO I don't love the idea of adding tokens durint *tokenize* call
-        # If we want to pretend that our midi sequences have start and finish
-        # we should take care of that before we get here :alarm:
-
-        df = pd.DataFrame(record)
-
-        # Quantize only dstart
-        df["next_start"] = df.start.shift(-1)
-        df["dstart"] = df.next_start - df.start
-        df["dstart_bin"] = np.digitize(df.dstart.fillna(0), self.bin_edges) - 1
+        dstart_bins = self.quantize(record["start"])
 
         # get tokens from quantized data
-        tokens = [str(dstart_bin) for dstart_bin in df["dstart_bin"]]
-
-        tokens = ["<s>"] + tokens + ["</s>"]
+        tokens = [str(dstart_bin) for dstart_bin in dstart_bins]
         return tokens
 
-    def untokenize(self, tokens: list[str]) -> pd.DataFrame:
+    def untokenize(self, tokens: list[str]) -> list[int]:
         dstarts = [int(token) for token in tokens if token not in self.specials]
-        df = pd.DataFrame(dstarts, columns=["dstart_bin"])
 
-        return df
+        return dstarts

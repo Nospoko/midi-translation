@@ -7,7 +7,8 @@ train:
   label_smoothing: 0.1
 
 dataset_name: 'roszcz/maestro-v1-sustain'
-target: velocity
+target: dstart
+dstart_bins: 200
 augmentation_probability: 0.2
 augmentation_rep: 0
 cache_dataset: True
