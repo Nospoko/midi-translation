@@ -8,9 +8,10 @@ train:
 
 dataset_name: 'roszcz/maestro-v1-sustain'
 target: velocity
-augmentation_probability: 0.2
-augmentation_rep: 0
-cache_dataset: True
+augmentation:
+  probability: 0.2
+  repetitions: 0
+  shift: 5
 
 dataset:
   sequence_len: 128

@@ -1,4 +1,5 @@
 from omegaconf import DictConfig
+from datasets import concatenate_datasets
 
 from training_utils import train_model
 from data.augmentation import augment_dataset
@@ -6,38 +7,36 @@ from data.tokenizer import VelocityEncoder, QuantizedMidiEncoder
 from data.dataset import MyTokenizedMidiDataset, load_cache_dataset
 
 
+def load_train_dataset(cfg: DictConfig):
+    datasets = []
+    for name in cfg.dataset_name.split("+"):
+        dataset = load_cache_dataset(
+            dataset_cfg=cfg.dataset,
+            dataset_name=name,
+            split="train",
+        )
+        datasets.append(dataset)
+    train_dataset = concatenate_datasets(datasets)
+
+    return train_dataset
+
+
 def load_datasets(cfg: DictConfig) -> tuple[MyTokenizedMidiDataset, MyTokenizedMidiDataset]:
     src_encoder = QuantizedMidiEncoder(quantization_cfg=cfg.dataset.quantization)
     tgt_encoder = VelocityEncoder()
 
-    if "maestro" in cfg.dataset_name:
-        train_translation_dataset = load_cache_dataset(
-            dataset_cfg=cfg.dataset,
-            dataset_name=cfg.dataset_name,
-            split="train",
-            cache_dataset=cfg.cache_dataset,
-        )
-        val_translation_dataset = load_cache_dataset(
-            dataset_cfg=cfg.dataset,
-            dataset_name=cfg.dataset_name,
-            split="validation",
-            cache_dataset=cfg.cache_dataset,
-        )
-    else:
-        translation_dataset = load_cache_dataset(
-            dataset_cfg=cfg.dataset,
-            dataset_name=cfg.dataset_name,
-            split="train",
-            cache_dataset=cfg.cache_dataset,
-        )
-        train_translation_dataset, val_translation_dataset = translation_dataset.train_test_split(0.1).values()
+    train_translation_dataset = load_train_dataset(cfg)
+    val_translation_dataset = load_cache_dataset(
+        dataset_cfg=cfg.dataset,
+        dataset_name="roszcz/maestro-v1-sustain",
+        split="test+validation",
+    )
 
-    if cfg.augmentation_rep > 0:
+    if cfg.augmentation.repetitions > 0:
         train_translation_dataset = augment_dataset(
             dataset=train_translation_dataset,
             dataset_cfg=cfg.dataset,
-            augmentation_probability=cfg.augmentation_probability,
-            augmentation_rep=cfg.augmentation_rep,
+            augmentation_cfg=cfg.augmentation,
         )
 
     train_dataset = MyTokenizedMidiDataset(

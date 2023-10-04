@@ -26,12 +26,13 @@ def build_translation_dataset(
     )
 
     quantized_pieces = []
+
     for it, record in tqdm(enumerate(dataset), total=len(dataset)):
         piece = ff.MidiPiece.from_huggingface(record)
         qpiece = quantizer.inject_quantization_features(piece)
 
         # We want to get back to the original recording easily
-        qpiece.source |= {"base_record_id": it, "dataset_name": dataset.info.splits["train"].dataset_name}
+        qpiece.source |= {"base_record_id": it, "dataset_name": dataset.info.description}
         quantized_pieces.append(qpiece)
 
     # ~10min for giant midi
@@ -133,8 +134,10 @@ def shard_and_build(
     num_shards: int = 2,
 ) -> Dataset:
     shard_paths = []
+
     for it in range(num_shards):
         path = f"{dataset_cache_path}-part-{it}"
+
         dataset_shard = dataset.shard(num_shards=num_shards, index=it)
         print(f"Processing shard {it} of {num_shards} with {len(dataset_shard)} records.")
 
@@ -155,13 +158,12 @@ def shard_and_build(
 def load_cache_dataset(
     dataset_cfg: DictConfig,
     dataset_name: str,
-    split: str,
+    split: str = "train",
     force_build: bool = False,
-    cache_dataset: bool = False,
 ) -> Dataset:
     # Prepare caching hash
     config_hash = hashlib.sha256()
-    config_string = json.dumps(OmegaConf.to_container(dataset_cfg)) + split + dataset_name
+    config_string = json.dumps(OmegaConf.to_container(dataset_cfg)) + dataset_name
     config_hash.update(config_string.encode())
     config_hash = config_hash.hexdigest()
 
@@ -176,8 +178,9 @@ def load_cache_dataset(
 
     print("Building translation dataset from", dataset_name, split)
     midi_dataset = load_dataset(dataset_name, split=split)
-    # make sure dataset.info.splits contains correct dataset_name - at least on train
-    midi_dataset.info.splits["train"].dataset_name = dataset_name
+
+    # using description to store dataset_name allows sharding to work properly
+    midi_dataset.info.description = dataset_name
 
     # hardcoded maximum shard size as 5000
     num_shards = len(midi_dataset) // 5000 + 1
