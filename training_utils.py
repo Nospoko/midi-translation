@@ -60,7 +60,7 @@ def train_model(
     optimizer = torch.optim.Adam(model.parameters(), lr=cfg.train.base_lr, betas=(0.9, 0.98), eps=1e-9)
     lr_scheduler = LambdaLR(
         optimizer=optimizer,
-        lr_lambda=lambda step: learning_rate_schedule(step, cfg.model.d_model, factor=1, warmup=cfg.warmup),
+        lr_lambda=lambda step: learning_rate_schedule(step, cfg.model.d_model, factor=1, warmup=cfg.train.warmup),
     )
     best_test_loss = float("inf")
     for epoch in range(cfg.train.num_epochs):

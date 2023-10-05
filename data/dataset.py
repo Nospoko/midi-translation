@@ -1,12 +1,14 @@
+import os
+import glob
 import json
 import hashlib
 
 import torch
 import fortepyan as ff
 from tqdm import tqdm
-from datasets import Dataset, load_dataset
 from omegaconf import OmegaConf, DictConfig
 from torch.utils.data import Dataset as TorchDataset
+from datasets import Dataset, load_dataset, concatenate_datasets
 
 from data.tokenizer import MidiEncoder
 from data.quantizer import MidiQuantizer
@@ -24,15 +26,16 @@ def build_translation_dataset(
     )
 
     quantized_pieces = []
+
     for it, record in tqdm(enumerate(dataset), total=len(dataset)):
         piece = ff.MidiPiece.from_huggingface(record)
         qpiece = quantizer.inject_quantization_features(piece)
 
         # We want to get back to the original recording easily
-        qpiece.source |= {"base_record_id": it, "dataset_name": dataset.info.dataset_name}
+        qpiece.source |= {"base_record_id": it, "dataset_name": dataset.info.description}
         quantized_pieces.append(qpiece)
 
-    # ~20min for giant midi
+    # ~10min for giant midi
     chopped_sequences = []
     for it, piece in tqdm(enumerate(quantized_pieces), total=len(quantized_pieces)):
         chopped_sequences += quantized_piece_to_records(
@@ -48,26 +51,29 @@ def build_translation_dataset(
 def quantized_piece_to_records(piece: ff.MidiPiece, sequence_len: int, sequence_step: int):
     chopped_sequences = []
     n_samples = 1 + (piece.size - sequence_len) // sequence_step
+    df = piece.df
     for jt in range(n_samples):
         start = jt * sequence_step
         finish = start + sequence_len
-        part = piece[start:finish]
+        part = df.iloc[start:finish]
+
+        source = piece.source.copy()
+        source |= {"start": start, "finish": finish}
 
         sequence = {
-            "pitch": part.df.pitch.astype("int16").values.T,
+            "pitch": part.pitch.astype("int16").values.T,
             # Quantized features
-            "dstart_bin": part.df.dstart_bin.astype("int16").values.T,
-            "duration_bin": part.df.duration_bin.astype("int16").values.T,
-            "velocity_bin": part.df.velocity_bin.astype("int16").values.T,
+            "dstart_bin": part.dstart_bin.astype("int16").values.T,
+            "duration_bin": part.duration_bin.astype("int16").values.T,
+            "velocity_bin": part.velocity_bin.astype("int16").values.T,
             # Ground truth
-            "start": part.df.start.values,
-            "end": part.df.end.values,
-            "duration": part.df.duration.values,
-            "velocity": part.df.velocity.values,
-            "source": json.dumps(part.source),
+            "start": part.start.values,
+            "end": part.end.values,
+            "duration": part.duration.values,
+            "velocity": part.velocity.values,
+            "source": json.dumps(source),
         }
         chopped_sequences.append(sequence)
-
     return chopped_sequences
 
 
@@ -117,19 +123,47 @@ class MyTokenizedMidiDataset(TorchDataset):
         cls_token_id = self.tgt_encoder.token_to_id["<CLS>"]
         src_token_ids.insert(0, cls_token_id)
         tgt_token_ids.insert(0, cls_token_id)
-        
+
         return src_token_ids, tgt_token_ids
+
+
+def shard_and_build(
+    dataset: Dataset,
+    dataset_cfg: DictConfig,
+    dataset_cache_path: str,
+    num_shards: int = 2,
+) -> Dataset:
+    shard_paths = []
+
+    for it in range(num_shards):
+        path = f"{dataset_cache_path}-part-{it}"
+
+        dataset_shard = dataset.shard(num_shards=num_shards, index=it)
+        print(f"Processing shard {it} of {num_shards} with {len(dataset_shard)} records.")
+
+        processed_shard = build_translation_dataset(dataset_shard, dataset_cfg=dataset_cfg)
+        processed_shard.save_to_disk(path)
+        shard_paths.append(path)
+
+    processed_dataset = concatenate_datasets([Dataset.load_from_disk(path) for path in shard_paths])
+
+    for path in shard_paths:
+        for file in glob.glob(f"{path}/*"):
+            os.remove(file)
+        os.rmdir(path)
+
+    return processed_dataset
 
 
 def load_cache_dataset(
     dataset_cfg: DictConfig,
     dataset_name: str,
-    split: str,
+    split: str = "train",
     force_build: bool = False,
 ) -> Dataset:
     # Prepare caching hash
     config_hash = hashlib.sha256()
-    config_string = json.dumps(OmegaConf.to_container(dataset_cfg)) + split + dataset_name
+    config_string = json.dumps(OmegaConf.to_container(dataset_cfg)) + dataset_name
     config_hash.update(config_string.encode())
     config_hash = config_hash.hexdigest()
 
@@ -144,10 +178,20 @@ def load_cache_dataset(
 
     print("Building translation dataset from", dataset_name, split)
     midi_dataset = load_dataset(dataset_name, split=split)
-    translation_dataset = build_translation_dataset(
+
+    # using description to store dataset_name allows sharding to work properly
+    midi_dataset.info.description = dataset_name
+
+    # hardcoded maximum shard size as 5000
+    num_shards = len(midi_dataset) // 5000 + 1
+    translation_dataset = shard_and_build(
         dataset=midi_dataset,
         dataset_cfg=dataset_cfg,
+        num_shards=num_shards,
+        dataset_cache_path=dataset_cache_path,
     )
     translation_dataset.save_to_disk(dataset_cache_path)
+    # load dataset again to update cache_files attribute
+    translation_dataset = Dataset.load_from_disk(dataset_cache_path)
 
     return translation_dataset
