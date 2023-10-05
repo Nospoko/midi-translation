@@ -86,13 +86,13 @@ def augment_dataset(dataset: Dataset, dataset_cfg: DictConfig, augmentation_cfg)
 
     If augmentation_cfg.repetitions is 0, will output a copy of the dataset.
     """
-
-    num_cpus = cpu_count()
     quantizer = MidiQuantizer(
         n_dstart_bins=dataset_cfg.quantization.dstart,
         n_duration_bins=dataset_cfg.quantization.duration,
         n_velocity_bins=dataset_cfg.quantization.velocity,
     )
+
+    num_cpus = cpu_count()
 
     dataset = dataset.map(
         apply_pitch_shift,
@@ -108,5 +108,4 @@ def augment_dataset(dataset: Dataset, dataset_cfg: DictConfig, augmentation_cfg)
         batch_size=1,
         num_proc=num_cpus,
     )
-
     return dataset
