@@ -3,7 +3,6 @@ import itertools
 import yaml
 import numpy as np
 import pandas as pd
-from uaclient import yaml
 from omegaconf import DictConfig
 from hydra.utils import to_absolute_path
 
