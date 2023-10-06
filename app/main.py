@@ -6,7 +6,7 @@ import fortepyan as ff
 from omegaconf import OmegaConf
 from fortepyan.audio import render as render_audio
 
-from app.tools import load_model, predict_velocity, predict_dstart
+from app.tools import load_model, predict_dstart, predict_velocity
 
 
 def run_dstart_app(midi_file, model_path: str):
@@ -39,7 +39,7 @@ def run_velocity_app(midi_file, model_path: str):
 
 def main():
     with gr.Blocks() as demo:
-        file = gr.File(file_count="single", label="midi file"),
+        file = (gr.File(file_count="single", label="midi file"),)
         with gr.Tab("Predict Velocity"):
             with gr.Row():
                 with gr.Column():

@@ -8,7 +8,7 @@ from model import make_model
 from data.quantizer import MidiQuantizer
 from utils import vocab_sizes, greedy_decode
 from data.dataset import quantized_piece_to_records
-from data.tokenizer import VelocityEncoder, DstartEncoder, QuantizedMidiEncoder
+from data.tokenizer import DstartEncoder, VelocityEncoder, QuantizedMidiEncoder
 
 
 def process_piece(train_cfg: DictConfig, piece: ff.MidiPiece, quantizer: MidiQuantizer) -> list[torch.Tensor]:
@@ -25,10 +25,7 @@ def process_piece(train_cfg: DictConfig, piece: ff.MidiPiece, quantizer: MidiQua
         sequence_step=train_cfg.dataset.sequence_len,
     )
     sequence_tokens = [
-        torch.tensor(
-            [[src_encoder.token_to_id["<CLS>"]] + src_encoder.encode(sequence)],
-            dtype=torch.int64
-        )
+        torch.tensor([[src_encoder.token_to_id["<CLS>"]] + src_encoder.encode(sequence)], dtype=torch.int64)
         for sequence in sequences
     ]
 
