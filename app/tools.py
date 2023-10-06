@@ -11,7 +11,7 @@ from data.dataset import quantized_piece_to_records
 from data.tokenizer import VelocityEncoder, QuantizedMidiEncoder
 
 
-def encode_record(sequence: dict, encoder: QuantizedMidiEncoder) -> torch.Tensor:
+def encode_add_cls(sequence: dict, encoder: QuantizedMidiEncoder) -> torch.Tensor:
     token_ids = encoder.encode(sequence)
     token_ids = [encoder.token_to_id["<CLS>"]] + token_ids
     return torch.tensor(token_ids, dtype=torch.int64)
@@ -30,7 +30,7 @@ def process_piece(train_cfg: DictConfig, piece: ff.MidiPiece, quantizer: MidiQua
         sequence_len=train_cfg.dataset.sequence_len,
         sequence_step=train_cfg.dataset.sequence_len,
     )
-    sequence_tokens = [encode_record(sequence, src_encoder) for sequence in sequences]
+    sequence_tokens = [encode_add_cls(sequence, src_encoder) for sequence in sequences]
 
     return sequence_tokens
 
