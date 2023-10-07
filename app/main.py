@@ -1,17 +1,17 @@
 import glob
 
-import numpy as np
 import torch
+import numpy as np
 import gradio as gr
 import fortepyan as ff
-from matplotlib import pyplot as plt
 from omegaconf import OmegaConf
+from matplotlib import pyplot as plt
 from fortepyan.audio import render as render_audio
 
 from app.tools import load_model, predict_dstart, predict_velocity
 
 
-def run_dstart_app(midi_file, model_path: str):
+def run_dstart_app(midi_file, model_path: str, progress=gr.Progress(track_tqdm=True)):
     checkpoint = torch.load(model_path, map_location="cpu")
     model = load_model(checkpoint)
     train_cfg = OmegaConf.create(checkpoint["cfg"])
@@ -32,7 +32,7 @@ def run_dstart_app(midi_file, model_path: str):
     return audio, image_from_plot
 
 
-def run_velocity_app(midi_file, model_path: str):
+def run_velocity_app(midi_file, model_path: str, progress=gr.Progress(track_tqdm=True)):
     checkpoint = torch.load(model_path, map_location="cpu")
     model = load_model(checkpoint)
     train_cfg = OmegaConf.create(checkpoint["cfg"])
@@ -85,7 +85,7 @@ def main():
             outputs=[dstart_out, dstart_pianoroll],
         )
 
-    demo.launch(server_name="0.0.0.0")
+    demo.queue().launch(server_name="0.0.0.0")
 
 
 if __name__ == "__main__":
