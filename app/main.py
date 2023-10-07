@@ -1,8 +1,10 @@
 import glob
 
+import numpy as np
 import torch
 import gradio as gr
 import fortepyan as ff
+from matplotlib import pyplot as plt
 from omegaconf import OmegaConf
 from fortepyan.audio import render as render_audio
 
@@ -20,7 +22,14 @@ def run_dstart_app(midi_file, model_path: str):
     audio_path = render_audio.midi_to_mp3(predicted_piece.to_midi(), "tmp/predicted-audio.mp3")
     audio = gr.make_waveform(audio_path)
 
-    return audio
+    fig = ff.view.draw_pianoroll_with_velocities(predicted_piece)
+    plt.tight_layout()
+
+    fig.canvas.draw()
+    image_from_plot = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8)
+    image_from_plot = image_from_plot.reshape(fig.canvas.get_width_height()[::-1] + (3,))
+
+    return audio, image_from_plot
 
 
 def run_velocity_app(midi_file, model_path: str):
@@ -34,7 +43,14 @@ def run_velocity_app(midi_file, model_path: str):
     audio_path = render_audio.midi_to_mp3(predicted_piece.to_midi(), "tmp/predicted-audio.mp3")
     audio = gr.make_waveform(audio_path)
 
-    return audio
+    fig = ff.view.draw_pianoroll_with_velocities(predicted_piece)
+    plt.tight_layout()
+
+    fig.canvas.draw()
+    image_from_plot = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8)
+    image_from_plot = image_from_plot.reshape(fig.canvas.get_width_height()[::-1] + (3,))
+
+    return audio, image_from_plot
 
 
 def main():
@@ -46,7 +62,8 @@ def main():
                     velocity_model_path = gr.Dropdown(glob.glob("checkpoints/velocity/*.pt"), label="model")
                     velocity_button = gr.Button("Predict")
                 with gr.Column():
-                    velocity_out = gr.Video()
+                    velocity_pianoroll = gr.Image(label="piano_roll")
+                    velocity_out = gr.Video(label="predicted_piece")
 
         with gr.Tab("Predict Dstart"):
             with gr.Row():
@@ -54,10 +71,19 @@ def main():
                     dstart_model_path = gr.Dropdown(glob.glob("checkpoints/dstart/*.pt"), label="model")
                     dstart_button = gr.Button("Predict")
                 with gr.Column():
-                    dstart_out = gr.Video()
+                    dstart_pianoroll = gr.Image(label="piano_roll")
+                    dstart_out = gr.Video(label="predicted_piece")
 
-        velocity_button.click(run_velocity_app, inputs=[file[0], velocity_model_path], outputs=velocity_out)
-        dstart_button.click(run_dstart_app, inputs=[file[0], dstart_model_path], outputs=dstart_out)
+        velocity_button.click(
+            run_velocity_app,
+            inputs=[file[0], velocity_model_path],
+            outputs=[velocity_out, velocity_pianoroll],
+        )
+        dstart_button.click(
+            run_dstart_app,
+            inputs=[file[0], dstart_model_path],
+            outputs=[dstart_out, dstart_pianoroll],
+        )
 
     demo.launch(server_name="0.0.0.0")
 
