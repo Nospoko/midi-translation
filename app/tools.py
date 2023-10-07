@@ -25,7 +25,7 @@ def process_piece(train_cfg: DictConfig, piece: ff.MidiPiece, quantizer: MidiQua
         sequence_step=train_cfg.dataset.sequence_len,
     )
     sequence_tokens = [
-        torch.tensor([[src_encoder.token_to_id["<CLS>"]] + src_encoder.encode(sequence)], dtype=torch.int64)
+        torch.tensor([src_encoder.token_to_id["<CLS>"]] + src_encoder.encode(sequence), dtype=torch.int64)
         for sequence in sequences
     ]
 
