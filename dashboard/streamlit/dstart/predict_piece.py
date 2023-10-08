@@ -10,8 +10,8 @@ from omegaconf import DictConfig
 
 from data.quantizer import MidiQuantizer
 from modules.label_smoothing import LabelSmoothing
-from dashboard.components import piece_selector, download_button
-from data.tokenizer import VelocityEncoder, QuantizedMidiEncoder
+from data.tokenizer import DstartEncoder, QuantizedMidiEncoder
+from dashboard.streamlit.components import piece_selector, download_button
 from data.dataset import MyTokenizedMidiDataset, quantized_piece_to_records
 from utils import vocab_sizes, piece_av_files, decode_and_output, calculate_average_distance
 
@@ -25,16 +25,18 @@ def predict_piece_dashboard(
 ):
     # Prepare everything required to make inference
     src_encoder = QuantizedMidiEncoder(train_cfg.dataset.quantization)
-    tgt_encoder = VelocityEncoder()
+    tgt_encoder = DstartEncoder(n_bins=train_cfg.dstart_bins)
 
     piece, piece_descriptor = piece_selector(dataset_name=train_cfg.dataset_name)
 
     # And run full pre-processing ...
     qpiece = quantizer.inject_quantization_features(piece)
+
+    # hard coded (idk if it needs changing)
     sequences = quantized_piece_to_records(
         piece=qpiece,
-        sequence_len=train_cfg.dataset.sequence_len,
-        sequence_step=train_cfg.dataset.sequence_len,
+        sequence_len=128,
+        sequence_step=128,
     )
     one_record_dataset = Dataset.from_list(sequences)
 
@@ -55,7 +57,6 @@ def predict_piece_dashboard(
 
     total_loss = 0
     total_dist = 0
-
     predicted_tokens = []
     for record in tqdm(dataset):
         src_token_ids = record["source_token_ids"]
@@ -64,7 +65,7 @@ def predict_piece_dashboard(
         predicted_token_ids, probabilities = decode_and_output(
             model=model,
             src=src_token_ids,
-            max_len=train_cfg.dataset.sequence_len,
+            max_len=128,
             device=train_cfg.device,
         )
 
@@ -78,12 +79,13 @@ def predict_piece_dashboard(
         total_loss += loss.item()
         total_dist += calculate_average_distance(probabilities, target).cpu()
 
-    pred_velocities = tgt_encoder.untokenize(predicted_tokens)
+    predictions = tgt_encoder.untokenize(predicted_tokens)
 
     predicted_piece_df = piece.df.copy()
-    predicted_piece_df = predicted_piece_df.head(len(pred_velocities))
+    predicted_piece_df = predicted_piece_df.head(len(predictions))
 
-    predicted_piece_df["velocity"] = pred_velocities
+    predicted_piece_df["start"] = tgt_encoder.unquantized_start(predictions)
+    predicted_piece_df["end"] = predicted_piece_df["start"] + predicted_piece_df["duration"]
     predicted_piece = MidiPiece(predicted_piece_df)
 
     predicted_piece.source = piece.source.copy()

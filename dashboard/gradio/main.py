@@ -8,7 +8,8 @@ from omegaconf import OmegaConf
 from matplotlib import pyplot as plt
 from fortepyan.audio import render as render_audio
 
-from app.tools import load_model, predict_dstart, predict_velocity
+from dashboard.gradio.tools import load_model, predict_dstart, predict_velocity
+import os
 
 
 def run_dstart_app(midi_file, model_path: str, progress=gr.Progress(track_tqdm=True)):
@@ -39,7 +40,6 @@ def run_velocity_app(midi_file, model_path: str, progress=gr.Progress(track_tqdm
 
     piece = ff.MidiPiece.from_file(midi_file.name)
     predicted_piece = predict_velocity(model, train_cfg, piece)
-
     audio_path = render_audio.midi_to_mp3(predicted_piece.to_midi(), "tmp/predicted-audio.mp3")
     audio = gr.make_waveform(audio_path)
 
@@ -50,12 +50,15 @@ def run_velocity_app(midi_file, model_path: str, progress=gr.Progress(track_tqdm
     image_from_plot = np.frombuffer(fig.canvas.tostring_rgb(), dtype=np.uint8)
     image_from_plot = image_from_plot.reshape(fig.canvas.get_width_height()[::-1] + (3,))
 
-    return audio, image_from_plot
+    file_name = f"tmp/predicted-{os.path.basename(midi_file.name)}"
+    predicted_piece.to_midi().write(file_name)
+
+    return audio, image_from_plot, file_name
 
 
 def main():
     with gr.Blocks() as demo:
-        file = (gr.File(file_count="single", label="midi file"),)
+        file = (gr.File(file_count="single", label="midi_file"),)
         with gr.Tab("Predict Velocity"):
             with gr.Row():
                 with gr.Column():
@@ -64,6 +67,7 @@ def main():
                 with gr.Column():
                     velocity_pianoroll = gr.Image(label="piano_roll")
                     velocity_out = gr.Video(label="predicted_piece")
+                    velocity_file = gr.File(label="predicted_midi")
 
         with gr.Tab("Predict Dstart"):
             with gr.Row():
@@ -73,16 +77,17 @@ def main():
                 with gr.Column():
                     dstart_pianoroll = gr.Image(label="piano_roll")
                     dstart_out = gr.Video(label="predicted_piece")
+                    dstart_file = gr.File(label="predicted_midi")
 
         velocity_button.click(
             run_velocity_app,
             inputs=[file[0], velocity_model_path],
-            outputs=[velocity_out, velocity_pianoroll],
+            outputs=[velocity_out, velocity_pianoroll, velocity_file],
         )
         dstart_button.click(
             run_dstart_app,
             inputs=[file[0], dstart_model_path],
-            outputs=[dstart_out, dstart_pianoroll],
+            outputs=[dstart_out, dstart_pianoroll, dstart_file],
         )
 
     demo.queue().launch(server_name="0.0.0.0")

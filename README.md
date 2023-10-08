@@ -47,7 +47,8 @@ You can train the model on
 data quantized into up to 10 bins.
 
 
-For example, if you want to use 5 bins for dstart, 4 for duration and 1 for velocity, you need to specify dataset.quantization hyperparameters:
+For example, if you want to use 5 bins for dstart, 4 for duration and 1 for velocity,
+you need to specify dataset.quantization hyperparameters:
 ```shell
 python train.py dataset.quantization.dstart=5 dataset.quantization.duration=4 dataset.quantization.velocity=1
 ```
@@ -100,11 +101,11 @@ To start the velocity prediction dashboard you need to run streamlit.
 
 ```shell
 # Streamlit has issues with accepting it's run in the root directory
-PYTHONPATH=. streamlit run --server.port 4466 dashboard/velocity/main.py
+PYTHONPATH=. streamlit run --server.port 4466 dashboard/streamlit/velocity/main.py
 ```
 For dstart prediction run:
 ```shell
-PYTHONPATH=. streamlit run --server.port 4466 dashboard/dstart/main.py
+PYTHONPATH=. streamlit run --server.port 4466 dashboard/streamlit/dstart/main.py
 ```
 
 #### Tokenization review dashboard
