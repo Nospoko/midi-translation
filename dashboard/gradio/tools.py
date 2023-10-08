@@ -154,7 +154,6 @@ def make_pianoroll_video(
         plt.clf()
 
         waveform_img = PIL.Image.open(tmp_img.name)
-        waveform_img = waveform_img.resize((1000, 400))
 
         img_width, img_height = waveform_img.size
         waveform_img.save(tmp_img.name)
