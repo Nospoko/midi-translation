@@ -1,8 +1,19 @@
+from __future__ import annotations
+
+import shutil
+import tempfile
+import subprocess
+
+import PIL
 import torch
+import PIL.Image
 import torch.nn as nn
 import fortepyan as ff
 from tqdm import tqdm
+import matplotlib.pyplot as plt
+from gradio import utils, processing_utils
 from omegaconf import OmegaConf, DictConfig
+from fortepyan.audio import render as render_audio
 
 from model import make_model
 from data.quantizer import MidiQuantizer
@@ -119,3 +130,52 @@ def predict_velocity(model: nn.Module, train_cfg: DictConfig, piece: ff.MidiPiec
 
     predicted_piece.source = piece.source.copy()
     return predicted_piece
+
+
+def make_pianoroll_video(
+    piece: ff.MidiPiece,
+) -> str:
+    audio_file = render_audio.midi_to_mp3(piece.to_midi(), "tmp/predicted-audio.mp3")
+    audio = processing_utils.audio_from_file(audio_file)
+
+    ffmpeg = shutil.which("ffmpeg")
+    if not ffmpeg:
+        raise RuntimeError("ffmpeg not found.")
+
+    duration = round(len(audio[1]) / audio[0], 4)
+
+    with utils.MatplotlibBackendMananger():
+        ff.view.draw_pianoroll_with_velocities(piece)
+        plt.tight_layout()
+
+        tmp_img = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+        savefig_kwargs = {"bbox_inches": "tight"}
+        plt.savefig(tmp_img.name, **savefig_kwargs)
+        plt.clf()
+
+        waveform_img = PIL.Image.open(tmp_img.name)
+        waveform_img = waveform_img.resize((1000, 400))
+
+        img_width, img_height = waveform_img.size
+        waveform_img.save(tmp_img.name)
+
+    # Convert waveform to video with ffmpeg
+    output_mp4 = tempfile.NamedTemporaryFile(suffix=".mp4", delete=False)
+    ffmpeg_cmd = [
+        ffmpeg,
+        "-loop",
+        "1",
+        "-i",
+        tmp_img.name,
+        "-i",
+        audio_file,
+        "-vf",
+        f"color=c=#FFFFFF77:s={img_width}x{img_height}[bar];[0][bar]overlay=-w+(w/{duration})*t:H-h:shortest=1",
+        "-t",
+        str(duration),
+        "-y",
+        output_mp4.name,
+    ]
+
+    subprocess.check_call(ffmpeg_cmd)
+    return output_mp4.name
