@@ -11,6 +11,7 @@ import torch.nn as nn
 import fortepyan as ff
 from tqdm import tqdm
 import matplotlib.pyplot as plt
+from fortepyan import MidiPiece
 from gradio import utils, processing_utils
 from omegaconf import OmegaConf, DictConfig
 from fortepyan.audio import render as render_audio
@@ -22,7 +23,7 @@ from data.dataset import quantized_piece_to_records
 from data.tokenizer import DstartEncoder, VelocityEncoder, QuantizedMidiEncoder
 
 
-def quantize_piece(train_cfg: DictConfig, piece: ff.MidiPiece) -> ff.MidiPiece:
+def quantize_piece(train_cfg: DictConfig, piece: MidiPiece) -> MidiPiece:
     quantizer = MidiQuantizer(
         n_dstart_bins=train_cfg.dataset.quantization.dstart,
         n_duration_bins=train_cfg.dataset.quantization.duration,
@@ -33,10 +34,10 @@ def quantize_piece(train_cfg: DictConfig, piece: ff.MidiPiece) -> ff.MidiPiece:
     qpiece = quantizer.inject_quantization_features(piece)
 
     qpiece.df = quantizer.apply_quantization(qpiece.df)
-    return ff.MidiPiece(qpiece.df)
+    return MidiPiece(qpiece.df)
 
 
-def process_piece(train_cfg: DictConfig, piece: ff.MidiPiece) -> list[torch.Tensor]:
+def process_piece(train_cfg: DictConfig, piece: MidiPiece) -> list[torch.Tensor]:
     """
     Run full pre-processing on a piece
     """
@@ -79,7 +80,7 @@ def load_model(checkpoint: dict) -> nn.Module:
     return model
 
 
-def predict_dstart(model: nn.Module, train_cfg: DictConfig, piece: ff.MidiPiece) -> ff.MidiPiece:
+def predict_dstart(model: nn.Module, train_cfg: DictConfig, piece: MidiPiece) -> MidiPiece:
     tgt_encoder = DstartEncoder(n_bins=train_cfg.dstart_bins)
     sequences = process_piece(train_cfg=train_cfg, piece=piece)
 
@@ -103,14 +104,14 @@ def predict_dstart(model: nn.Module, train_cfg: DictConfig, piece: ff.MidiPiece)
 
     predicted_piece_df["start"] = tgt_encoder.unquantized_start(predictions)
     predicted_piece_df["end"] = predicted_piece_df["start"] + predicted_piece_df["duration"]
-    predicted_piece = ff.MidiPiece(predicted_piece_df)
+    predicted_piece = MidiPiece(predicted_piece_df)
 
     predicted_piece.source = piece.source.copy()
 
     return predicted_piece
 
 
-def predict_velocity(model: nn.Module, train_cfg: DictConfig, piece: ff.MidiPiece):
+def predict_velocity(model: nn.Module, train_cfg: DictConfig, piece: MidiPiece):
     """
     Returns a MidiPiece with velocity predicted by the model.
     """
@@ -136,15 +137,18 @@ def predict_velocity(model: nn.Module, train_cfg: DictConfig, piece: ff.MidiPiec
     predicted_piece_df = predicted_piece_df.head(len(pred_velocities))
 
     predicted_piece_df["velocity"] = pred_velocities
-    predicted_piece = ff.MidiPiece(predicted_piece_df)
+    predicted_piece = MidiPiece(predicted_piece_df)
 
     predicted_piece.source = piece.source.copy()
     return predicted_piece
 
 
 def make_pianoroll_video(
-    piece: ff.MidiPiece,
+    piece: MidiPiece,
 ) -> str:
+    """
+    Create a .mp4 file from MidiPiece.
+    """
     audio_file = render_audio.midi_to_mp3(piece.to_midi(), "tmp/predicted-audio.mp3")
     audio = processing_utils.audio_from_file(audio_file)
 
