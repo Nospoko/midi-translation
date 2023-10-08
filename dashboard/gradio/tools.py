@@ -22,11 +22,30 @@ from data.dataset import quantized_piece_to_records
 from data.tokenizer import DstartEncoder, VelocityEncoder, QuantizedMidiEncoder
 
 
-def process_piece(train_cfg: DictConfig, piece: ff.MidiPiece, quantizer: MidiQuantizer) -> list[torch.Tensor]:
+def quantize_piece(train_cfg: DictConfig, piece: ff.MidiPiece) -> ff.MidiPiece:
+    quantizer = MidiQuantizer(
+        n_dstart_bins=train_cfg.dataset.quantization.dstart,
+        n_duration_bins=train_cfg.dataset.quantization.duration,
+        n_velocity_bins=train_cfg.dataset.quantization.velocity,
+    )
+
+    # pre-process the piece ...
+    qpiece = quantizer.inject_quantization_features(piece)
+
+    qpiece.df = quantizer.apply_quantization(qpiece.df)
+    return ff.MidiPiece(qpiece.df)
+
+
+def process_piece(train_cfg: DictConfig, piece: ff.MidiPiece) -> list[torch.Tensor]:
     """
     Run full pre-processing on a piece
     """
     src_encoder = QuantizedMidiEncoder(train_cfg.dataset.quantization)
+    quantizer = MidiQuantizer(
+        n_dstart_bins=train_cfg.dataset.quantization.dstart,
+        n_duration_bins=train_cfg.dataset.quantization.duration,
+        n_velocity_bins=train_cfg.dataset.quantization.velocity,
+    )
 
     # pre-process the piece ...
     qpiece = quantizer.inject_quantization_features(piece)
@@ -35,6 +54,7 @@ def process_piece(train_cfg: DictConfig, piece: ff.MidiPiece, quantizer: MidiQua
         sequence_len=train_cfg.dataset.sequence_len,
         sequence_step=train_cfg.dataset.sequence_len,
     )
+
     sequence_tokens = [
         torch.tensor([src_encoder.token_to_id["<CLS>"]] + src_encoder.encode(sequence), dtype=torch.int64)
         for sequence in sequences
@@ -61,12 +81,7 @@ def load_model(checkpoint: dict) -> nn.Module:
 
 def predict_dstart(model: nn.Module, train_cfg: DictConfig, piece: ff.MidiPiece) -> ff.MidiPiece:
     tgt_encoder = DstartEncoder(n_bins=train_cfg.dstart_bins)
-    quantizer = MidiQuantizer(
-        n_dstart_bins=train_cfg.dataset.quantization.dstart,
-        n_duration_bins=train_cfg.dataset.quantization.duration,
-        n_velocity_bins=train_cfg.dataset.quantization.velocity,
-    )
-    sequences = process_piece(train_cfg=train_cfg, piece=piece, quantizer=quantizer)
+    sequences = process_piece(train_cfg=train_cfg, piece=piece)
 
     predicted_tokens = []
     for record in tqdm(sequences):
@@ -100,12 +115,7 @@ def predict_velocity(model: nn.Module, train_cfg: DictConfig, piece: ff.MidiPiec
     Returns a MidiPiece with velocity predicted by the model.
     """
     tgt_encoder = VelocityEncoder()
-    quantizer = MidiQuantizer(
-        n_dstart_bins=train_cfg.dataset.quantization.dstart,
-        n_duration_bins=train_cfg.dataset.quantization.duration,
-        n_velocity_bins=train_cfg.dataset.quantization.velocity,
-    )
-    sequences = process_piece(train_cfg=train_cfg, piece=piece, quantizer=quantizer)
+    sequences = process_piece(train_cfg=train_cfg, piece=piece)
 
     predicted_tokens = []
     for record in tqdm(sequences):
