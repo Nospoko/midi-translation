@@ -50,10 +50,12 @@ def process_piece(train_cfg: DictConfig, piece: MidiPiece) -> list[torch.Tensor]
 
     # pre-process the piece ...
     qpiece = quantizer.inject_quantization_features(piece)
+
+    sequence_len = min(train_cfg.dataset.sequence_len, len(qpiece.df))
     sequences = quantized_piece_to_records(
         piece=qpiece,
-        sequence_len=train_cfg.dataset.sequence_len,
-        sequence_step=train_cfg.dataset.sequence_len,
+        sequence_len=sequence_len,
+        sequence_step=sequence_len,
     )
 
     sequence_tokens = [
@@ -91,7 +93,7 @@ def predict_dstart(model: nn.Module, train_cfg: DictConfig, piece: MidiPiece) ->
         predicted_token_ids = greedy_decode(
             model=model,
             src=src_token_ids,
-            max_len=train_cfg.dataset.sequence_len,
+            max_len=len(src_token_ids)-1,  # -1 because of the cls token
         )
 
         out_tokens = [tgt_encoder.vocab[x] for x in predicted_token_ids]
@@ -125,7 +127,7 @@ def predict_velocity(model: nn.Module, train_cfg: DictConfig, piece: MidiPiece):
         predicted_token_ids = greedy_decode(
             model=model,
             src=src_token_ids,
-            max_len=train_cfg.dataset.sequence_len,
+            max_len=len(src_token_ids)-1,
         )
 
         out_tokens = [tgt_encoder.vocab[x] for x in predicted_token_ids]
