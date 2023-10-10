@@ -8,6 +8,31 @@ from omegaconf import OmegaConf
 
 from dashboard.gradio.tools import load_model, predict_dstart, quantize_piece, predict_velocity, make_pianoroll_video
 
+DESCRIPTION = """
+<h1>🎵 Modelling dynamic expression in music. 🎶</h1>
+<h3>AI Pianist</h3>
+<p>This interactive application uses an AI model to generate music sequences based on quantized midi files.
+You can upload your midi file and it will be quantized, passed to the model and it will play it with expression.</p>
+<div style="display: flex; justify-content: space-between;">
+    <div style="width: 45%; margin-right: 5%;">
+        <h2>Features:</h2>
+        <ul>
+            <li>🎹 Upload your midi file with piano performance.</li>
+            <li>🎼 Select the target (velocity, dstart or both).</li>
+            <li>▶️ Click the predict button and await the result!</li>
+        </ul>
+    </div>
+    <div style="width: 45%; margin-left: 5%;">
+        <h2>Outputs:</h2>
+        <p>The app outputs the following:</p>
+        <ul>
+            <li>🎧 The audio and pianoroll of the generated song.</li>
+            <li>📁 A MIDI file of the song.</li>
+        </ul>
+    </div>
+</div>
+"""
+
 
 def run_predict_app(midi_file, dstart_model_path: str, velocity_model_path: str, progress=gr.Progress(track_tqdm=True)):
     dstart_checkpoint = torch.load(dstart_model_path, map_location="cpu")
@@ -100,6 +125,7 @@ def run_velocity_app(midi_file, model_path: str, progress=gr.Progress(track_tqdm
 
 def main():
     with gr.Blocks(title="MIDI modelling") as demo:
+        gr.HTML(DESCRIPTION)
         file = gr.File(file_count="single", label="midi_file")
         with gr.Tab("Both Models"):
             with gr.Row():
