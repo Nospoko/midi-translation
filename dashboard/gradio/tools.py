@@ -93,7 +93,7 @@ def predict_dstart(model: nn.Module, train_cfg: DictConfig, piece: MidiPiece) ->
         predicted_token_ids = greedy_decode(
             model=model,
             src=src_token_ids,
-            max_len=len(src_token_ids)-1,  # -1 because of the cls token
+            max_len=len(src_token_ids) - 1,  # -1 because of the cls token
         )
 
         out_tokens = [tgt_encoder.vocab[x] for x in predicted_token_ids]
@@ -127,7 +127,7 @@ def predict_velocity(model: nn.Module, train_cfg: DictConfig, piece: MidiPiece):
         predicted_token_ids = greedy_decode(
             model=model,
             src=src_token_ids,
-            max_len=len(src_token_ids)-1,
+            max_len=len(src_token_ids) - 1,
         )
 
         out_tokens = [tgt_encoder.vocab[x] for x in predicted_token_ids]
