@@ -159,23 +159,23 @@ def make_pianoroll_video(
         raise RuntimeError("ffmpeg not found.")
 
     duration = round(len(audio[1]) / audio[0], 4)
-
     with utils.MatplotlibBackendMananger():
         ff.view.draw_pianoroll_with_velocities(piece)
         plt.tight_layout()
 
-        tmp_img = tempfile.NamedTemporaryFile(suffix=".png", delete=False)
+        tmp_img = tempfile.NamedTemporaryFile(suffix=".png", delete=False, dir="tmp/dashboard/gradio")
         savefig_kwargs = {"bbox_inches": "tight"}
         plt.savefig(tmp_img.name, **savefig_kwargs)
         plt.clf()
 
         waveform_img = PIL.Image.open(tmp_img.name)
+        waveform_img = waveform_img.resize((1000, 532))
 
         img_width, img_height = waveform_img.size
         waveform_img.save(tmp_img.name)
 
     # Convert waveform to video with ffmpeg
-    output_mp4 = tempfile.NamedTemporaryFile(suffix=".mp4", delete=False)
+    output_mp4 = tempfile.NamedTemporaryFile(suffix=".mp4", delete=False, dir="tmp/dashboard/gradio")
     ffmpeg_cmd = [
         ffmpeg,
         "-loop",
