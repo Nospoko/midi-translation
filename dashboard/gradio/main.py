@@ -34,7 +34,44 @@ You can upload your midi file and it will be quantized, passed to the model and 
 """
 
 
-def run_predict_app(midi_file, dstart_model_path: str, velocity_model_path: str, progress=gr.Progress(track_tqdm=True)):
+def run_sequential_pred_app(
+    midi_file,
+    velocity_model_path: str,
+    dstart_model_path: str,
+    progress=gr.Progress(track_tqdm=True),
+):
+    dstart_checkpoint = torch.load(dstart_model_path, map_location="cpu")
+    dstart_model = load_model(dstart_checkpoint)
+    dstart_cfg = OmegaConf.create(dstart_checkpoint["cfg"])
+
+    velocity_checkpoint = torch.load(velocity_model_path, map_location="cpu")
+    velocity_model = load_model(velocity_checkpoint)
+    velocity_cfg = OmegaConf.create(velocity_checkpoint["cfg"])
+
+    piece = ff.MidiPiece.from_file(midi_file.name)
+    original_vid = make_pianoroll_video(piece)
+
+    # seperate function to create quantized piece for better clarity
+    # might think of a way to quantize only one time e.g. pass qpiece instead of piece to predict_velocity/dstart
+    qpiece = quantize_piece(dstart_cfg, piece)
+    quantized_vid = make_pianoroll_video(qpiece)
+
+    pred_velocity = predict_velocity(velocity_model, velocity_cfg, piece)
+    qpiece.df = qpiece.df.head(len(pred_velocity.df))
+    qpiece.df["velocity"] = pred_velocity.df["velocity"]
+    pred_velocity_vid = make_pianoroll_video(qpiece)
+
+    pred_dstart = predict_dstart(dstart_model, dstart_cfg, pred_velocity)
+
+    vid = make_pianoroll_video(pred_dstart)
+
+    file_name = f"tmp/pred-{os.path.basename(midi_file.name)}"
+    pred_dstart.to_midi().write(file_name)
+
+    return original_vid, quantized_vid, pred_velocity_vid, vid, file_name
+
+
+def run_predict_app(midi_file, velocity_model_path: str, dstart_model_path: str, progress=gr.Progress(track_tqdm=True)):
     dstart_checkpoint = torch.load(dstart_model_path, map_location="cpu")
     dstart_model = load_model(dstart_checkpoint)
     dstart_cfg = OmegaConf.create(dstart_checkpoint["cfg"])
@@ -124,13 +161,14 @@ def run_velocity_app(midi_file, model_path: str, progress=gr.Progress(track_tqdm
 
 
 def main():
+    # layout
     with gr.Blocks(title="MIDI modelling") as demo:
         gr.HTML(DESCRIPTION)
         file = gr.File(file_count="single", label="midi_file")
         with gr.Tab("Both Models"):
             with gr.Row():
-                dstart_path = gr.Dropdown(glob.glob("checkpoints/dstart/*.pt"), label="dstart_model")
                 velocity_path = gr.Dropdown(glob.glob("checkpoints/velocity/*.pt"), label="velocity_model")
+                dstart_path = gr.Dropdown(glob.glob("checkpoints/dstart/*.pt"), label="dstart_model")
                 predict_button = gr.Button("Predict")
             with gr.Row():
                 original = gr.Video(label="original_piece")
@@ -138,6 +176,19 @@ def main():
                 out = gr.Video(label="predicted_piece")
             with gr.Row():
                 predicted_file = gr.File()
+
+        with gr.Tab("Sequential predictions"):
+            with gr.Row():
+                seq_velocity_path = gr.Dropdown(glob.glob("checkpoints/velocity/*.pt"), label="velocity_model")
+                seq_dstart_path = gr.Dropdown(glob.glob("checkpoints/dstart/*128v*.pt"), label="dstart_model")
+                seq_predict_button = gr.Button("Predict")
+            with gr.Row():
+                seq_original = gr.Video(label="original_piece")
+                seq_quantized = gr.Video(label="quantized_piece")
+                seq_pred_velocity = gr.Video(label="predicted_velocity")
+                seq_out = gr.Video(label="predicted_piece")
+            with gr.Row():
+                seq_predicted_file = gr.File()
 
         with gr.Tab("Predict Velocity"):
             with gr.Row():
@@ -161,6 +212,7 @@ def main():
             with gr.Row():
                 dstart_file = gr.File(label="predicted_midi")
 
+        # button clicks
         velocity_button.click(
             run_velocity_app,
             inputs=[file, velocity_model_path],
@@ -173,8 +225,13 @@ def main():
         )
         predict_button.click(
             run_predict_app,
-            inputs=[file, dstart_path, velocity_path],
+            inputs=[file, velocity_path, dstart_path],
             outputs=[original, quantized, out, predicted_file],
+        )
+        seq_predict_button.click(
+            run_sequential_pred_app,
+            inputs=[file, seq_velocity_path, seq_dstart_path],
+            outputs=[seq_original, seq_quantized, seq_pred_velocity, seq_out, seq_predicted_file],
         )
 
     demo.queue().launch(server_name="0.0.0.0")
