@@ -1,11 +1,13 @@
-.idea/*
+.idea
 *__pycache__*
 dataset*.pt
 tmp/*
 *.pt
-outputs/*
-wandb/*
+outputs
+wandb
 checkpoints/*
 documentation/files
-midi_files/*
+midi_files
 upload_models.py
+flagged
+save_midi_file.py

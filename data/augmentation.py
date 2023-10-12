@@ -30,7 +30,8 @@ def pitch_shift(pitch: list[int], shift_threshold: int = 5) -> list[int]:
     if low_shift > high_shift:
         shift = 0
     else:
-        shift = random.randint(low_shift, high_shift + 1)
+        # numbers from [low_shift, high_shift]
+        shift = random.randint(low_shift, high_shift)
     pitch = [value + shift for value in pitch]
 
     return pitch

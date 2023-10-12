@@ -10,8 +10,8 @@ from omegaconf import DictConfig
 
 from data.quantizer import MidiQuantizer
 from modules.label_smoothing import LabelSmoothing
-from dashboard.components import piece_selector, download_button
 from data.tokenizer import VelocityEncoder, QuantizedMidiEncoder
+from dashboard.streamlit.components import piece_selector, download_button
 from data.dataset import MyTokenizedMidiDataset, quantized_piece_to_records
 from utils import vocab_sizes, piece_av_files, decode_and_output, calculate_average_distance
 
