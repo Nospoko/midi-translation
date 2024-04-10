@@ -107,10 +107,15 @@ def model_predictions_review(
 ):
     # load checkpoint, force dashboard device
     dataset_cfg = train_cfg.dataset
-    dataset_name = st.text_input(label="dataset", value=train_cfg.dataset_name)
-    split = st.text_input(label="split", value="test")
+    with st.form("select_dataset"):
+        dataset_name = st.text_input(label="dataset", value=train_cfg.dataset_name)
+        split = st.text_input(label="split", value="test")
 
-    random_seed = st.selectbox(label="random seed", options=range(20))
+        random_seed = st.selectbox(label="random seed", options=range(20))
+        run_button = st.form_submit_button(label="Run")
+    
+    if not run_button:
+        return
 
     # load translation dataset and create MyTokenizedMidiDataset
     src_encoder = QuantizedMidiEncoder(quantization_cfg=train_cfg.dataset.quantization)

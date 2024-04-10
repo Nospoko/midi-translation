@@ -26,8 +26,12 @@ def predict_piece_dashboard(
     # Prepare everything required to make inference
     src_encoder = QuantizedMidiEncoder(train_cfg.dataset.quantization)
     tgt_encoder = VelocityEncoder()
-
-    piece, piece_descriptor = piece_selector(dataset_name=train_cfg.dataset_name)
+    with st.form("select_piece"):
+        piece, piece_descriptor = piece_selector(dataset_name=train_cfg.dataset_name)
+        run_button = st.form_submit_button(label="Run")
+    
+    if not run_button:
+        return
 
     # And run full pre-processing ...
     qpiece = quantizer.inject_quantization_features(piece)
